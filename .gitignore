@@ -1,0 +1,26 @@
+# Course Document Binaries (as per configuration)
+*.pdf
+*.PDF
+
+# Obsidian
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/cache
+.obsidian/graph.json
+.trash/
+
+# OS and System Files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+# IDE / Editor Files
+.vscode/
+.idea/
+*.swp
+*~
