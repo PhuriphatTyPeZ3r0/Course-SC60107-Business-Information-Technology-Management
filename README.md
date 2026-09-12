@@ -18,6 +18,7 @@
 
 ```text
 05_SC60107_Business-IT-Management/
+├── 00_Templates/               # Template โน้ตและคู่มือ format
 ├── 01_Lectures/
 │   ├── 01_Docs/               # เอกสารและตำราประกอบการสอน (Syllabus, ใบงาน)
 │   └── 02_Teaching_Slides/    # สไลด์ประกอบการสอนประจำสัปดาห์
