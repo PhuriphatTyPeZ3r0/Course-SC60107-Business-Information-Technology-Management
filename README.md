@@ -5,7 +5,7 @@
 
 ---
 
-## 📌 ข้อมูลรายวิชาเบื้องต้น
+## <span class="material-symbols-outlined">push_pin</span> ข้อมูลรายวิชาเบื้องต้น
 
 - **รหัสวิชา:** SC60107
 - **หน่วยกิต:** 3
@@ -14,7 +14,7 @@
 
 ---
 
-## 🗂️ โครงสร้าง Repository (Project Structure)
+## <span class="material-symbols-outlined">folder_copy</span> โครงสร้าง Repository (Project Structure)
 
 ```text
 05_SC60107_Business-IT-Management/
@@ -30,7 +30,7 @@
 
 ---
 
-## 💡 วิธีการใช้งาน (How to Use)
+## <span class="material-symbols-outlined">lightbulb</span> วิธีการใช้งาน (How to Use)
 
 - **เปิดอ่านผ่าน GitHub:** สามารถคลิกลิงก์ Markdown เพื่ออ่านเนื้อหาผ่าน GitHub ได้ทันที
 - **เปิดผ่าน Obsidian:** สามารถเปิดโฟลเดอร์นี้เป็น Obsidian Vault ได้ทันที รองรับ Wikilinks, MathJax ($...$), Callouts (`> [!info]`), และ Mermaid Diagrams
