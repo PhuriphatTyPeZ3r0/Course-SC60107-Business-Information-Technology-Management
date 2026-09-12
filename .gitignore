@@ -1,6 +1,8 @@
 # Course Document Binaries (as per configuration)
 *.pdf
 *.PDF
+*.pptx
+*.PPTX
 
 # Obsidian
 .obsidian/workspace.json
