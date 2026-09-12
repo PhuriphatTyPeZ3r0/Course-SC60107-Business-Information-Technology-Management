@@ -5,7 +5,7 @@ tags: [bitm, meta, guide]
 # คู่มือ Format การสรุปโน้ตวิชา Business IT Management (SC60107)
 
 โน้ตทุกไฟล์ในวิชานี้ใช้ format เดียวกัน (เหมือนกับทุกวิชาใน repository ชุดนี้) เพื่อให้:
-- สแกนข้ามโน้ตของแต่ละคนได้เร็ว (emoji หัวข้อเดียวกันหมด อยู่ตำแหน่งเดิมเสมอ)
+- สแกนข้ามโน้ตของแต่ละคนได้เร็ว (icon หัวข้อเดียวกันหมด อยู่ตำแหน่งเดิมเสมอ)
 - backlink ระหว่างโน้ต ↔ MOC ทำงานได้จริง ไม่ขาดตอน
 - ทุกคนสรุปแล้วเอามารวม/แชร์กันได้โดยไม่ต้องแปลง format
 
@@ -39,15 +39,15 @@ Template 2 ไฟล์ในโฟลเดอร์นี้ (`Lecture-Note-Te
 ## กฎโครงสร้างโน้ตรายหัวข้อ (`Lecture-Note-Template.md`)
 
 1. **H1** — ชื่อหัวข้อภาษาไทย (ใส่ภาษาอังกฤษกำกับในวงเล็บถ้าเป็นศัพท์เทคนิคที่ควรจำ)
-2. **บรรทัด nav บนสุด** — `⬅️ กลับไปที่ [[WeekN-MOC]] | ก่อนหน้า: [[...]]`
+2. **บรรทัด nav บนสุด** — `<span class="material-symbols-outlined">arrow_back</span> กลับไปที่ [[WeekN-MOC]] | ก่อนหน้า: [[...]]`
    - โน้ตแรกของสัปดาห์: ตัดส่วน "ก่อนหน้า" ออก เหลือแค่ลิงก์กลับ MOC
-3. **🔑 Keyword** (บังคับ) — list คำศัพท์/แนวคิดหลัก 2-5 ตัว แบบ **ตัวหนา** + คำอธิบาย 1 บรรทัด ไม่ใช่ theory ยาว ๆ
-4. **📖 Theory (เข้าใจง่าย)** (บังคับ) — เนื้อหาหลัก ใช้ตาราง/สูตร LaTeX (`$...$`)/callout ได้ตามความเหมาะสม แบ่ง `###` ย่อยได้ถ้ายาว
-5. **🖼️ Diagram** (มีเงื่อนไข — ดูหัวข้อถัดไป)
-6. **บรรทัดปิดท้าย** — `---` แล้วตามด้วย `➡️ ต่อไป: [[...]]`
+3. **<span class="material-symbols-outlined">key</span> Keyword** (บังคับ) — list คำศัพท์/แนวคิดหลัก 2-5 ตัว แบบ **ตัวหนา** + คำอธิบาย 1 บรรทัด ไม่ใช่ theory ยาว ๆ
+4. **<span class="material-symbols-outlined">menu_book</span> Theory (เข้าใจง่าย)** (บังคับ) — เนื้อหาหลัก ใช้ตาราง/สูตร LaTeX (`$...$`)/callout ได้ตามความเหมาะสม แบ่ง `###` ย่อยได้ถ้ายาว
+5. **<span class="material-symbols-outlined">schema</span> Diagram** (มีเงื่อนไข — ดูหัวข้อถัดไป)
+6. **บรรทัดปิดท้าย** — `---` แล้วตามด้วย `<span class="material-symbols-outlined">arrow_forward</span> ต่อไป: [[...]]`
    - โน้ตสุดท้ายของสัปดาห์: เปลี่ยนเป็นลิงก์กลับ MOC แทน
 
-### เมื่อไหร่ต้องมี 🖼️ Diagram และเมื่อไหร่ไม่ต้องมี
+### เมื่อไหร่ต้องมี <span class="material-symbols-outlined">schema</span> Diagram และเมื่อไหร่ไม่ต้องมี
 
 ใส่เฉพาะเมื่อหัวข้อมี **ขั้นตอน/กระบวนการ/decision flow** ที่วาด mermaid flowchart แล้วช่วยความเข้าใจจริง (เช่น ขั้นตอนของอัลกอริทึม training/inference) ถ้าหัวข้อเป็นเนื้อหาบอกเล่า/นิยาม/ตารางล้วน ๆ ไม่มีลำดับขั้นตอน **ให้ลบ section นี้ทิ้งทั้งหมด**
 
@@ -55,25 +55,25 @@ Template 2 ไฟล์ในโฟลเดอร์นี้ (`Lecture-Note-Te
 
 1. **H1** — `Week N — <ชื่อหัวข้อสัปดาห์ภาษาอังกฤษ> (MOC)`
 2. **บรรทัด nav บนสุด** — ลิงก์สัปดาห์ก่อนหน้า (ไม่มีในสัปดาห์แรกของวิชา)
-3. **✅ เช็คลิสต์ก่อนเข้าเรียน** (บังคับ) — checkbox list สิ่งที่ควรทบทวน/เตรียมก่อนเข้าเรียน แต่ละข้อลิงก์ไปโน้ตที่เกี่ยวข้อง
-4. **📋 ภาพรวมสัปดาห์ N (สรุปย่อ)** (บังคับ) — ย่อหน้าสรุปเนื้อหาทั้งสัปดาห์ ทุกสัปดาห์มี section นี้เสมอ
-5. **🗺️ แผนที่หัวข้อสัปดาห์ N** (บังคับ) — mermaid `graph TD` แสดงหัวข้อหลัก → หัวข้อย่อย ของสัปดาห์นั้น
-6. **📚 โน้ตรายหัวข้อ** (บังคับ) — ตาราง หัวข้อ / เนื้อหาหลัก / หน้าสไลด์
+3. **<span class="material-symbols-outlined">check_circle</span> เช็คลิสต์ก่อนเข้าเรียน** (บังคับ) — checkbox list สิ่งที่ควรทบทวน/เตรียมก่อนเข้าเรียน แต่ละข้อลิงก์ไปโน้ตที่เกี่ยวข้อง
+4. **<span class="material-symbols-outlined">assignment</span> ภาพรวมสัปดาห์ N (สรุปย่อ)** (บังคับ) — ย่อหน้าสรุปเนื้อหาทั้งสัปดาห์ ทุกสัปดาห์มี section นี้เสมอ
+5. **<span class="material-symbols-outlined">map</span> แผนที่หัวข้อสัปดาห์ N** (บังคับ) — mermaid `graph TD` แสดงหัวข้อหลัก → หัวข้อย่อย ของสัปดาห์นั้น
+6. **<span class="material-symbols-outlined">collections_bookmark</span> โน้ตรายหัวข้อ** (บังคับ) — ตาราง หัวข้อ / เนื้อหาหลัก / หน้าสไลด์
 7. **callout ปิดท้าย** (ไม่บังคับ แต่แนะนำ) — เลือกได้ตามบริบท เช่น `[!tip]` สรุปจุดที่มักสับสน หรือแอบดูหัวข้อสัปดาห์หน้า
 8. **บรรทัดปิดท้าย** — ลิงก์สัปดาห์ถัดไป (ใส่ทีหลังตอนสร้าง MOC สัปดาห์ถัดไปแล้ว ถ้ายังไม่มีให้ลบบรรทัดนี้ก่อน)
 
-## ชุด Emoji หัวข้อ (ตายตัว ห้ามเปลี่ยน)
+## ชุด Icon หัวข้อ (ตายตัว ห้ามเปลี่ยน)
 
-| Emoji | ใช้กับ | ความหมาย |
-| --- | --- | --- |
-| ⬅️ ➡️ | ทุกโน้ต | นำทางไปก่อนหน้า/ถัดไป |
-| 🔑 | โน้ตหัวข้อ | Keyword |
-| 📖 | โน้ตหัวข้อ | Theory |
-| 🖼️ | โน้ตหัวข้อ | Diagram |
-| ✅ | MOC | เช็คลิสต์ก่อนเข้าเรียน |
-| 📋 | MOC | ภาพรวมสัปดาห์ |
-| 🗺️ | MOC | แผนที่หัวข้อ (mermaid) |
-| 📚 | MOC | ตารางโน้ตรายหัวข้อ |
+| Icon (Material Symbols) | รหัส HTML | ใช้กับ | ความหมาย |
+| --- | --- | --- | --- |
+| arrow_back / arrow_forward | `<span class="material-symbols-outlined">arrow_back</span>` / `<span class="material-symbols-outlined">arrow_forward</span>` | ทุกโน้ต | นำทางไปก่อนหน้า/ถัดไป |
+| key | `<span class="material-symbols-outlined">key</span>` | โน้ตหัวข้อ | Keyword |
+| menu_book | `<span class="material-symbols-outlined">menu_book</span>` | โน้ตหัวข้อ | Theory |
+| schema | `<span class="material-symbols-outlined">schema</span>` | โน้ตหัวข้อ | Diagram |
+| check_circle | `<span class="material-symbols-outlined">check_circle</span>` | MOC | เช็คลิสต์ก่อนเข้าเรียน |
+| assignment | `<span class="material-symbols-outlined">assignment</span>` | MOC | ภาพรวมสัปดาห์ |
+| map | `<span class="material-symbols-outlined">map</span>` | MOC | แผนที่หัวข้อ (mermaid) |
+| collections_bookmark | `<span class="material-symbols-outlined">collections_bookmark</span>` | MOC | ตารางโน้ตรายหัวข้อ |
 
 ## Callout ที่ใช้ได้
 
@@ -91,4 +91,4 @@ Template 2 ไฟล์ในโฟลเดอร์นี้ (`Lecture-Note-Te
 - [ ] `week` ใน frontmatter ตรงกับ `tags`
 - [ ] ลิงก์ `[[...]]` ทั้งหมดชี้ไปโน้ตที่มีอยู่จริง (ไม่ใช่ placeholder)
 - [ ] ถ้าไม่มี Diagram section ต้องเป็นเพราะหัวข้อไม่มีกระบวนการจริง ๆ ไม่ใช่ขี้เกียจวาด
-- [ ] เพิ่มแถวของโน้ตนี้ใน MOC (ตาราง 📚 + แผนที่ 🗺️) ของสัปดาห์นั้นแล้ว
+- [ ] เพิ่มแถวของโน้ตนี้ใน MOC (ตาราง <span class="material-symbols-outlined">collections_bookmark</span> + แผนที่ <span class="material-symbols-outlined">map</span>) ของสัปดาห์นั้นแล้ว
