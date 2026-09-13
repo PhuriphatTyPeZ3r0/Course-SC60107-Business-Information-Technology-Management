@@ -47,9 +47,21 @@ Template 2 ไฟล์ในโฟลเดอร์นี้ (`Lecture-Note-Te
 6. **บรรทัดปิดท้าย** — `---` แล้วตามด้วย `<span class="material-symbols-outlined">arrow_forward</span> ต่อไป: [[...]]`
    - โน้ตสุดท้ายของสัปดาห์: เปลี่ยนเป็นลิงก์กลับ MOC แทน
 
-### เมื่อไหร่ต้องมี <span class="material-symbols-outlined">schema</span> Diagram และเมื่อไหร่ไม่ต้องมี
+### กฎมาตรฐานการใช้ Diagram เป็น UML (Context-Driven UML Standard)
 
-ใส่เฉพาะเมื่อหัวข้อมี **ขั้นตอน/กระบวนการ/decision flow** ที่วาด mermaid flowchart แล้วช่วยความเข้าใจจริง (เช่น ขั้นตอนของอัลกอริทึม training/inference) ถ้าหัวข้อเป็นเนื้อหาบอกเล่า/นิยาม/ตารางล้วน ๆ ไม่มีลำดับขั้นตอน **ให้ลบ section นี้ทิ้งทั้งหมด**
+Diagram ในโน้ตรายหัวข้อต้องเลือกใช้ประเภทของ **UML Diagram (ผ่าน Mermaid Syntax)** ให้เหมาะสมกับบริบทของเนื้อหา โดยมีเกณฑ์จำแนกดังนี้:
+
+| ประเภท UML | Mermaid Keyword | ใช้กับบริบทใด | องค์ประกอบสัญลักษณ์ที่ต้องใช้ |
+| :--- | :--- | :--- | :--- |
+| **Activity Diagram** | `flowchart TD` หรือ `LR` | กระบวนการทางธุรกิจ (Business Process), เวิร์กโฟลว์ ITIL, ขั้นตอนดำเนินงาน | เริ่มต้น `((●))`, กิจกรรม `([Action])`, เงื่อนไข `{Decision?}`, สิ้นสุด `(((●)))`, แยกระบบ/บทบาท `subgraph` (Swimlanes) |
+| **Sequence Diagram** | `sequenceDiagram` | การประสานงานระหว่างฝ่าย/ระบบ (User, IT Support, Service Desk, ERP) | `actor`, `participant`, `->>`, `-->>`, `alt/else` |
+| **State Machine Diagram** | `stateDiagram-v2` | วงจรชีวิตของเคส/คำร้องขอ (Incident Lifecycle, Change Request State) | `[*]`, สถานะ `State`, ทรานซิชัน `-->`, เงื่อนไข `[condition]` |
+| **Class / Entity Diagram** | `classDiagram` หรือ `flowchart` | โครงสร้างข้อมูลระบบสารสนเทศ, ผังความสัมพันธ์เอนทิตี (ER/Class) | `class`, `+field`, การสืบทอด `<\|--` |
+
+> [!important] ข้อปฏิบัติในการเขียน Diagram
+> - **Bilingual Text:** ข้อความอธิบายเป็นภาษาไทย พร้อมระบุศัพท์เทคนิคภาษาอังกฤษกำกับ (เช่น `([อนุมัติคำร้องขอ <br> (Approve Request)])`)
+> - **เมื่อไหร่ไม่ต้องใส่:** ถ้าหัวข้อเป็นเนื้อหาบอกเล่า/นิยาม/ตารางล้วน ๆ ไม่มีลำดับขั้นตอน ปฏิสัมพันธ์ หรือสถานะ **ให้ลบ section Diagram ทิ้งทั้งหมด**
+> - **แผนที่หัวข้อใน MOC:** ยังคงใช้ `graph TD` สำหรับ Topic Hierarchy เช่นเดิม เพื่อความสะดวกในการคลิกนำทางใน Obsidian
 
 ## กฎโครงสร้าง MOC (`MOC-Template.md`)
 

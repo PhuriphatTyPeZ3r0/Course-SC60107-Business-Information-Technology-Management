@@ -24,18 +24,23 @@ date: {{date}}
 ## <span class="material-symbols-outlined">schema</span> Diagram
 
 <!--
-ใส่ section นี้เฉพาะเมื่อหัวข้อมี "ขั้นตอน/กระบวนการ" ที่วาด flowchart แล้วช่วยความเข้าใจจริง ๆ เท่านั้น
-ถ้าหัวข้อเป็นเนื้อหาบอกเล่า/นิยาม/ตารางล้วน ๆ ไม่มีลำดับขั้นตอน ให้ลบ section นี้ทิ้งทั้งหมด
+เกณฑ์มาตรฐาน UML Diagram (เลือกประเภทให้ตรงกับบริบทของเนื้อหา):
+1. UML Activity Diagram (กระบวนการทางธุรกิจ Business Process/เวิร์กโฟลว์ ITIL/ไปป์ไลน์การจัดการ) -> ใช้ flowchart TD/LR พร้อมโหนด Start ((●)), Action ([...]), Decision {...}, End (((●))) หรือแบ่ง Swimlanes ด้วย subgraph
+2. UML Sequence Diagram (ขั้นตอนการขออนุมัติ/ลำดับการสื่อสารระหว่าง User, Support, System) -> ใช้ sequenceDiagram
+3. UML State Machine Diagram (วงจรชีวิต Incident/Change Request/Lifecycle ของระบบสารสนเทศ) -> ใช้ stateDiagram-v2
+4. UML Class/Entity Diagram (โครงสร้างองค์กร/ความสัมพันธ์ Data Model ในระบบ) -> ใช้ classDiagram หรือ flowchart
+
+*หากเนื้อหาเป็นคำอธิบาย/นิยาม/ตารางล้วน ๆ ไม่มีขั้นตอนหรือสภาวะ ให้ลบ section นี้ทิ้งทั้งหมด*
 -->
 
 ```mermaid
 flowchart TD
-    Start(["<จุดเริ่มต้น>"]) --> Step1["<ขั้นตอนที่ 1>"]
-    Step1 --> Check{"<เงื่อนไข?>"}
-    Check -->|"<กรณี 1>"| Path1["<ผลลัพธ์ย่อย>"]
-    Check -->|"<กรณี 2>"| Path2["<ผลลัพธ์ย่อย>"]
-    Path1 --> Done(["<ผลลัพธ์/คำตอบ>"])
-    Path2 --> Done
+    Start((●)) --> Step1(["<ขั้นตอนที่ 1 : Action Name>"])
+    Step1 --> Check{"<เงื่อนไขการตัดสินใจ?>"}
+    Check -->|"<เงื่อนไขจริง (True)>"| Step2(["<ขั้นตอนที่ 2 : Action Name>"])
+    Check -->|"<เงื่อนไขเท็จ (False)>"| StepAlt(["<ขั้นตอนสำรอง : Alternative Action>"])
+    Step2 --> EndNode(((●)))
+    StepAlt --> EndNode
 ```
 
 **ตัวอย่าง:** <ตัวอย่างประกอบสั้น ๆ พร้อมอ้างอิงเลขหน้าสไลด์ถ้ามี>
