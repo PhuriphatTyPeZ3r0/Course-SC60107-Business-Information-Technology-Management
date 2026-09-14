@@ -1,15 +1,15 @@
-# SC60107 Business Information Technology Management (การจัดการเทคโนโลยีสารสนเทศทางธุรกิจ)
+﻿# SC60107 Business Information Technology Management (การจัดการเทคโนโลยีสารสนเทศทางธุรกิจ)
 
 <div align="center">
 
 [![Institution: PIM](https://img.shields.io/badge/Institution-PIM-003366?style=for-the-badge&logo=google-classroom&logoColor=white)](https://www.pim.ac.th/)
-[![Faculty: CPE & AI](https://img.shields.io/badge/Faculty-CPE%20%26%20AI-blue?style=for-the-badge)](https://www.pim.ac.th/)
+[![Program: CAI](https://img.shields.io/badge/Program-CAI-blue?style=for-the-badge)](https://www.pim.ac.th/)
 [![Academic Year](https://img.shields.io/badge/Academic%20Year-1%2F2569%20(2026)-orange?style=for-the-badge)](https://github.com/PhuriphatTyPeZ3r0)
 [![Grade](https://img.shields.io/badge/Status-In%20Progress%20(กำลังศึกษา)-yellow?style=for-the-badge)](https://github.com/PhuriphatTyPeZ3r0)
 [![Obsidian Compatible](https://img.shields.io/badge/Obsidian-Vault%20Ready-7C3AED?style=for-the-badge&logo=obsidian&logoColor=white)](https://obsidian.md/)
 
 **คลังสรุปเนื้อหา แบบฝึกหัด เอกสารบรรยาย โครงงาน และแนวข้อสอบประจำรายวิชา**  
-*สาขาวิชาวิศวกรรมคอมพิวเตอร์และปัญญาประดิษฐ์ (CPE & AI) — สถาบันการจัดการปัญญาภิวัฒน์ (PIM)*
+*สาขาวิชาวิศวกรรมคอมพิวเตอร์และปัญญาประดิษฐ์ (CAI) — สถาบันการจัดการปัญญาภิวัฒน์ (PIM)*
 
 </div>
 
@@ -106,7 +106,7 @@ Course-SC60107-Business-Information-Technology-Management/
 ## 👨‍💻 8. ผู้จัดทำ (Author)
 
 **Phuriphat Hemakul (PhuriphatTyPeZ3r0)**
-- 🎓 นักศึกษา สาขาวิศวกรรมคอมพิวเตอร์และปัญญาประดิษฐ์ (CPE & AI)
+- 🎓 นักศึกษา สาขาวิศวกรรมคอมพิวเตอร์และปัญญาประดิษฐ์ (CAI)
 - 🏛️ สถาบันการจัดการปัญญาภิวัฒน์ (PIM)
 - 🐙 GitHub: [@PhuriphatTyPeZ3r0](https://github.com/PhuriphatTyPeZ3r0)
 - 🌐 Portfolio: [resume-phuriphat-hemakul.vercel.app](https://resume-phuriphat-hemakul.vercel.app)
