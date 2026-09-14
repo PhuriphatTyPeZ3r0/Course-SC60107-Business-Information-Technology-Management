@@ -109,4 +109,4 @@ Course-SC60107-Business-Information-Technology-Management/
 - <img src="https://api.iconify.design/material-symbols:school-outline.svg?color=%230284C7" width="16" height="16" align="center" /> นักศึกษา สาขาวิศวกรรมคอมพิวเตอร์และปัญญาประดิษฐ์ (CAI)
 - <img src="https://api.iconify.design/material-symbols:apartment-rounded.svg?color=%230284C7" width="16" height="16" align="center" /> สถาบันการจัดการปัญญาภิวัฒน์ (PIM)
 - <img src="https://api.iconify.design/simple-icons:github.svg?color=%23181717" width="16" height="16" align="center" /> GitHub: [@PhuriphatTyPeZ3r0](https://github.com/PhuriphatTyPeZ3r0)
-- <img src="https://api.iconify.design/material-symbols:language.svg?color=%233B82F6" width="16" height="16" align="center" /> Portfolio: [resume-phuriphat-hemakul.vercel.app](https://resume-phuriphat-hemakul.vercel.app)
+- <img src="https://api.iconify.design/material-symbols:language.svg?color=%233B82F6" width="16" height="16" align="center" /> Portfolio: [portfolio-phuriphatizamus-projects.vercel.app](https://portfolio-phuriphatizamus-projects.vercel.app)
