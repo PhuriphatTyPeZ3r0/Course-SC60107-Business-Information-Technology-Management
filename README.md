@@ -44,19 +44,16 @@
 
 ```text
 Course-SC60107-Business-Information-Technology-Management/
-├── 00_Templates/               # Template โน้ตสรุปและคู่มือ Markdown/Obsidian
-├── 01_Lectures/                # เอกสารการสอน สไลด์บรรยาย และชีตสรุป
-│   ├── 01_Docs/               # ประมวลรายวิชา (Syllabus) และเอกสารอ้างอิง
-│   └── 02_Teaching_Slides/    # สไลด์บรรยายประจำบท (Technology Trends, Marketing)
-├── 02_Labs_Assignments/       # ใบงาน แบบฝึกหัด และการมอบหมายงานภาคปฏิบัติ
+├── 00_Templates/                     # Template โน้ตสรุปและคู่มือ Markdown/Obsidian
+├── 02_Labs_Assignments/              # ใบงาน แบบฝึกหัด และการมอบหมายงานภาคปฏิบัติ
 │   └── AI Coaching 10 คะแนน.docx
-├── 03_Projects/                # โครงงานและแผนกลยุทธ์ไอทีธุรกิจ
-│   └── README.md
-├── 04_Exams_Review/            # สรุปทบทวนเนื้อหาและแนวข้อสอบกลางภาค/ปลายภาค
-└── README.md                   # สารบัญหลักและภาพรวมรายวิชา
+├── 03_Project/                       # โครงงานประจำรายวิชา
+│   └── Whisper_Backend_API/         # FastAPI + Docker: Thai audio transcription/diarization/summarization service
+│       └── README.md                # เอกสารโครงสร้างและวิธีใช้งานของโครงงาน
+└── README.md                         # สารบัญหลักและภาพรวมรายวิชา
 ```
 
-> **หมายเหตุ:** โครงสร้างนี้รองรับการเปิดอ่านบน GitHub และเปิดเป็น **Obsidian Vault** โดยสมบูรณ์ (รองรับ Callouts, Markdown Tables, Mermaid)
+> **หมายเหตุ:** โครงสร้างข้างต้นสะท้อนสถานะปัจจุบันของ Repository เท่านั้น ส่วน `01_Lectures/` และ `04_Exams_Review/` จะถูกเพิ่มเข้ามาเมื่อมีเนื้อหาในภายหลัง โครงสร้างนี้รองรับการเปิดอ่านบน GitHub และเปิดเป็น **Obsidian Vault** โดยสมบูรณ์ (รองรับ Callouts, Markdown Tables, Mermaid)
 
 ---
 
@@ -79,12 +76,12 @@ Course-SC60107-Business-Information-Technology-Management/
 
 ## <img src="https://api.iconify.design/material-symbols:trophy-outline.svg?color=%23F59E0B" width="22" height="22" align="center" /> 5. โครงงานประจำรายวิชา (Course Projects)
 
-> โครงงานแผนกลยุทธ์และการเปลี่ยนผ่านธุรกิจด้วยเทคโนโลยีสารสนเทศ (เก็บอยู่ในโฟลเดอร์ `03_Projects/`)
+> โครงงานประจำรายวิชา (เก็บอยู่ในโฟลเดอร์ `03_Project/`)
 
-### 💼 IT Strategic Plan & Business Digital Transformation
-- **บทบาทและหน้าที่:** การวิเคราะห์กรณีศึกษาธุรกิจจริง การประเมิน Digital Maturity Model การวางแผนกลยุทธ์ด้านเทคโนโลยีสารสนเทศ และการออกแบบ Roadmap การเปลี่ยนผ่านองค์กรสู่ระบบดิจิทัล
-- **เทคโนโลยีและกรอบแนวคิด:** `Enterprise Architecture, SWOT/TOWS Analysis, ITIL, Digital Transformation Framework`
-- **ซอร์สโค้ดและเอกสารแผนงาน:** [โฟลเดอร์โครงงาน](03_Projects/)
+### 🎙️ Whisper Backend API
+- **บทบาทและหน้าที่:** บริการ Backend API สำหรับถอดเสียงพูดภาษาไทยเป็นข้อความ (Transcription) แยกผู้พูด (Speaker Diarization) และสรุปเนื้อหา (Summarization) โดยจำลองการนำเทคโนโลยี AI มาประยุกต์ใช้แก้ปัญหาทางธุรกิจจริง เช่น การถอดเทปประชุมและสรุปรายงานอัตโนมัติ
+- **เทคโนโลยีและกรอบแนวคิด:** `FastAPI, Docker, WhisperX (large-v3), pyannote.audio, Ollama (qwen2.5:3b)`
+- **ซอร์สโค้ดและเอกสารแผนงาน:** [โฟลเดอร์โครงงาน](03_Project/Whisper_Backend_API/) · [README โครงงาน](03_Project/Whisper_Backend_API/README.md)
 
 ---
 
