@@ -1,0 +1,49 @@
+model_name: large-v3
+language: th
+
+# whisperx has no built-in default alignment model for Thai (it only auto-picks
+# for a fixed set of languages), so it must be named explicitly here as a
+# wav2vec2 CTC model fine-tuned on Thai. Verify this repo still exists/works
+# on huggingface.co before relying on it; swap it for another Thai wav2vec2
+# CTC checkpoint if it doesn't.
+align_model: airesearch/wav2vec2-large-xlsr-53-th
+
+device: cuda
+# int8 keeps large-v3's VRAM footprint to ~1.5-1.7GB; float16 needs ~3GB,
+# which doesn't fit this deployment's tight VRAM budget (see min_free_vram_mb
+# below) alongside the OS/desktop's own GPU usage.
+compute_type: int8
+batch_size: 16
+
+# Alignment (wav2vec2) and Ollama summarization run on CPU on purpose: the
+# whole card only has a few GB free after OS/desktop overhead, and whisper
+# itself is the only model worth spending that on.
+align_device: cpu
+
+# Input constraints
+allowed_extensions: [".wav", ".mp3", ".m4a", ".flac", ".ogg", ".webm"]
+max_file_size_mb: 25
+max_duration_sec: 1800
+
+# Concurrency / serving
+request_timeout_sec: 300
+max_queue_size: 10
+
+# Reject GPU-bound requests (transcribe, diarize) instead of risking a CUDA
+# OOM crash if the whole card's free VRAM drops below this. Counts every
+# process on the GPU (OS/desktop included), not just this container's own
+# usage - see the grilling notes on the 3.5GB total-card budget.
+min_free_vram_mb: 300
+
+host: 0.0.0.0
+port: 8050
+
+# /summarize talks to a separate Ollama container (see docker-compose.yaml).
+# OLLAMA_BASE_URL env var overrides this if set. qwen2.5:3b (not 7b) because
+# Ollama runs CPU-only here to stay inside the VRAM budget.
+ollama_base_url: http://ollama:11434
+ollama_model: qwen2.5:3b
+
+# Gated Hugging Face model, needed only for mono-file speaker separation in
+# /diarize (stereo files never need it). Supplied via the HF_TOKEN env var
+# at runtime (see docker-compose.yaml), never baked into the image.

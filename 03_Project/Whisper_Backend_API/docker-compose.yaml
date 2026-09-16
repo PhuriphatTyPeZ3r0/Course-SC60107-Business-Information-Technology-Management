@@ -1,0 +1,42 @@
+name: whisper-backend-api
+
+services:
+  whisper-api:
+    build: .
+    image: whisper-backend-api:latest
+    ports:
+      - "8050:8050"
+    restart: unless-stopped
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      # Gated HF model for mono-file /diarize only; leave unset to keep
+      # transcribe/summarize/stereo-diarize working without it. Set in a
+      # .env file next to this compose file, or export before `docker compose up`.
+      - HF_TOKEN=${HF_TOKEN:-}
+    depends_on:
+      ollama:
+        condition: service_healthy
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # CPU-only on purpose: the single GPU's VRAM budget is fully committed to
+  # whisper (see config.yaml's compute_type/align_device notes) - Ollama
+  # gets no GPU reservation here.
+  ollama:
+    build:
+      context: .
+      dockerfile: Dockerfile.ollama
+      args:
+        OLLAMA_MODEL: qwen2.5:3b
+    image: whisper-backend-ollama:latest
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
