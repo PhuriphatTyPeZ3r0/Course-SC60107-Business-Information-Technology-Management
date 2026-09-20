@@ -14,6 +14,7 @@ packaged as Docker containers for a single GPU with a tight VRAM budget.
 Whisper_Backend_API/
 ├── main.py                      # Entry point: loads config, runs uvicorn (workers=1, see below)
 ├── config.yaml                  # Model, device, and serving configuration
+├── API_SPEC.md                  # API reference: endpoints, schemas, errors, examples
 ├── requirements.txt             # Python dependencies
 ├── docker-compose.yaml          # whisper-api service (joins Summarize_Model's network)
 ├── Dockerfile                   # whisper-api image
@@ -57,6 +58,8 @@ FIFO queue (`BoundedSerialGate` in `Process/Service.py`); once the queue is
 full, new requests get a `QueueFullError` instead of piling up. A free-VRAM
 check gates admission so a burst of requests can't crash the process with a
 CUDA out-of-memory error.
+
+Full request/response reference: [API_SPEC.md](API_SPEC.md).
 
 ## Setup
 
