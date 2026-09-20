@@ -96,21 +96,17 @@ async def lifespan(app: FastAPI):
     )
     model = load_model(config["model_name"], device, config.get("compute_type", "int8"))
 
-    language = config["language"]
-    logger.info("Loading alignment model for language '%s' on %s ...", language, align_device)
-    align_model, align_metadata = whisperx.load_align_model(
-        language_code=language, device=align_device, model_name=config.get("align_model")
-    )
-
     pipeline = WhisperPipeline(
         model=model,
-        align_model=align_model,
-        align_metadata=align_metadata,
+        align_models=config.get("align_models", {}),
         device=device,
         align_device=align_device,
-        language=language,
         batch_size=config.get("batch_size", 16),
     )
+    # Aligners for other languages load on first use; these are just ready up front.
+    for language in config.get("warm_align_languages", []):
+        pipeline.load_aligner(language)
+
     gate = BoundedSerialGate(
         config.get("max_queue_size", 10), min_free_vram_mb=config.get("min_free_vram_mb")
     )
@@ -120,9 +116,11 @@ async def lifespan(app: FastAPI):
         model=config.get("ollama_model", "qwen2.5:3b"),
     )
 
-    # Just constructs the wrapper; the actual pyannote pipeline (and its HF
-    # token check) loads lazily on the first mono /diarize request.
-    diarization_pipeline = LazyDiarizationPipeline(hf_token=os.environ.get("HF_TOKEN"), device="cpu")
+    # Just constructs the wrapper; the SpeechBrain speaker model loads lazily
+    # on the first mono /diarize request.
+    diarization_pipeline = LazyDiarizationPipeline(
+        device="cpu", num_speakers=config.get("diarize_num_speakers", 2) or None
+    )
 
     logger.info("Model ready, serving requests.")
 
@@ -233,9 +231,9 @@ async def summarize(file: UploadFile = File(...)):
 @app.post("/diarize")
 async def diarize(file: UploadFile = File(...)):
     """Stereo (2ch) files are channel-split (A=left, B=right); mono (1ch)
-    files fall back to ML speaker diarization (pyannote, dynamic speaker
-    count, labeled SPEAKER_1/SPEAKER_2/...) since there's no channel to
-    split. Anything else (3+ channels) is rejected.
+    files fall back to ML speaker diarization (SpeechBrain ECAPA embeddings +
+    clustering, no token needed; speakers labeled A, B, C, ... by first
+    appearance) since there's no channel to split. Anything else (3+ channels) is rejected.
     """
     tmp_path = None
     left_path = None
@@ -268,9 +266,9 @@ async def diarize(file: UploadFile = File(...)):
         if channels == 1:
             async with gate:
                 transcript = await _run_with_timeout(
-                    pipeline.transcribe_text_only, tmp_path, max_duration_sec, timeout=timeout
+                    pipeline.transcribe_with_chars, tmp_path, max_duration_sec, timeout=timeout
                 )
-            # CPU-only pyannote work runs outside the GPU gate so it doesn't
+            # CPU-only speaker-separation work runs outside the GPU gate so it doesn't
             # hold up other requests waiting on the GPU.
             turns = await asyncio.to_thread(diarization_pipeline.diarize, tmp_path)
             return build_mono_diarized_transcript(transcript, turns)

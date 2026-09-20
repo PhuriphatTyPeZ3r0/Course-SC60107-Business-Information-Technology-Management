@@ -1,12 +1,20 @@
 model_name: large-v3
-language: th
 
-# whisperx has no built-in default alignment model for Thai (it only auto-picks
-# for a fixed set of languages), so it must be named explicitly here as a
-# wav2vec2 CTC model fine-tuned on Thai. Verify this repo still exists/works
-# on huggingface.co before relying on it; swap it for another Thai wav2vec2
-# CTC checkpoint if it doesn't.
-align_model: airesearch/wav2vec2-large-xlsr-53-th
+# No language setting: the language is detected per request (large-v3 is
+# multilingual), so audio in any language Whisper knows can be sent in.
+#
+# Word/character alignment needs a wav2vec2 CTC model per language. whisperx
+# ships defaults for many languages (English, etc.) but none for Thai, so
+# languages that need an explicit model are named here. Verify the repo still
+# exists on huggingface.co, or swap in another Thai wav2vec2 CTC checkpoint.
+# A language with neither a default nor an entry here is still transcribed,
+# just without word-level timing.
+align_models:
+  th: airesearch/wav2vec2-large-xlsr-53-th
+
+# Aligners baked into the image at build time and loaded at startup. Any other
+# language loads on first use (downloading its model if it isn't cached).
+warm_align_languages: [th, en]
 
 device: cuda
 # int8 keeps large-v3's VRAM footprint to ~1.5-1.7GB; float16 needs ~3GB,
@@ -26,7 +34,7 @@ max_file_size_mb: 25
 max_duration_sec: 1800
 
 # Concurrency / serving
-request_timeout_sec: 300
+request_timeout_sec: 600
 max_queue_size: 10
 
 # Reject GPU-bound requests (transcribe, diarize) instead of risking a CUDA
@@ -44,6 +52,7 @@ port: 8050
 ollama_base_url: http://ollama:11434
 ollama_model: qwen2.5:3b
 
-# Gated Hugging Face model, needed only for mono-file speaker separation in
-# /diarize (stereo files never need it). Supplied via the HF_TOKEN env var
-# at runtime (see docker-compose.yaml), never baked into the image.
+# Mono-file speaker separation in /diarize (stereo files are split by channel
+# instead). Uses a public SpeechBrain model, no token needed. 2 = a two-party
+# service call (staff + customer); 0 lets the model guess, which over-splits.
+diarize_num_speakers: 2

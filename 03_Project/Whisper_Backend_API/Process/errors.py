@@ -35,18 +35,6 @@ class SummarizerUnavailableError(ApiError):
     code = "SUMMARIZER_UNAVAILABLE"
 
 
-class LanguageMismatchError(ApiError):
-    status_code = 422
-    code = "LANGUAGE_MISMATCH"
-
-    def __init__(self, detected: str, expected: str):
-        self.detected = detected
-        self.expected = expected
-        super().__init__(
-            f"Detected audio language '{detected}' does not match the configured language '{expected}'"
-        )
-
-
 class AudioTooLongError(ApiError):
     status_code = 413
     code = "AUDIO_TOO_LONG"

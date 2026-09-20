@@ -1,11 +1,12 @@
 # Whisper Backend API
 
-FastAPI backend that transcribes, diarizes, and summarizes Thai audio. Wraps
+FastAPI backend that transcribes, diarizes, and summarizes audio in any language Whisper supports (Thai and English are
+warmed up by default). Wraps
 [WhisperX](https://github.com/m-bain/whisperX) (large-v3, word-level alignment)
-for transcription, [pyannote.audio](https://github.com/pyannote/pyannote-audio)
+for transcription, [SpeechBrain](https://speechbrain.github.io/) (ECAPA speaker embeddings)
 for mono-file speaker diarization, and a local [Ollama](https://ollama.com/)
-model for summarization — packaged to run as two Docker containers on a
-single GPU with a tight VRAM budget.
+model for summarization (deployed separately from `../Summarize_Model`) —
+packaged as Docker containers for a single GPU with a tight VRAM budget.
 
 ## Structure
 
@@ -13,16 +14,14 @@ single GPU with a tight VRAM budget.
 Whisper_Backend_API/
 ├── main.py                      # Entry point: loads config, runs uvicorn (workers=1, see below)
 ├── config.yaml                  # Model, device, and serving configuration
-├── .env.example                 # Template for .env (HF_TOKEN); copy and fill in, never commit .env
 ├── requirements.txt             # Python dependencies
-├── docker-compose.yaml          # whisper-api + ollama services
+├── docker-compose.yaml          # whisper-api service (joins Summarize_Model's network)
 ├── Dockerfile                   # whisper-api image
-├── Dockerfile.ollama            # ollama image (CPU-only, pulls qwen2.5:3b)
 ├── .dockerignore
 ├── Process/
 │   ├── Service.py               # FastAPI app: routes, request gating, error handling
 │   ├── Process.py               # WhisperPipeline: transcribe + word-level alignment
-│   ├── diarization_pipeline.py  # Lazy-loaded pyannote pipeline (mono-file diarization)
+│   ├── diarization_pipeline.py  # Lazy-loaded SpeechBrain pipeline (mono-file diarization)
 │   ├── diarize.py               # Merges channel/speaker turns into a diarized transcript
 │   ├── audio_channels.py        # Channel probing and stereo-channel splitting
 │   ├── summarize.py             # OllamaSummarizer: talks to the Ollama container
@@ -31,17 +30,22 @@ Whisper_Backend_API/
 ├── scripts/
 │   └── prefetch_models.py       # Pre-downloads whisper/align/diarization models at build time
 └── utils/
-    └── load_utils.py            # Config loading and model loading helpers
+    ├── load_utils.py            # Config loading and model loading helpers
+    └── speaker_model.py         # Loads the SpeechBrain speaker model (shared by service and build)
 ```
 
 ## What it does
 
 - **`POST /transcribe`** — upload an audio file, get back a full transcript
-  with word-level timestamps (WhisperX, Thai by default).
+  with word-level timestamps (WhisperX). The language is detected
+  automatically per request — nothing to configure; see `align_models` in
+  `config.yaml` for languages needing an explicit alignment model.
 - **`POST /diarize`** — speaker-attributed transcript. Stereo (2-channel)
   files are split by channel (labeled `A`/`B`, no ML needed); mono files fall
-  back to pyannote speaker diarization (dynamic speaker count, labeled
-  `SPEAKER_1`, `SPEAKER_2`, ...). Anything else (3+ channels) is rejected.
+  back to SpeechBrain speaker diarization (no token needed; two speakers by
+  default via `diarize_num_speakers`, labeled `A`, `B`, `C`, ... by first
+  appearance). Each segment is returned as `start`, `end`, `speaker`, `text`.
+  Anything else (3+ channels) is rejected.
 - **`POST /summarize`** — transcribes, then summarizes the text via the
   Ollama container.
 - **`GET /health`** — `{"status": "ok"}` once the models are loaded,
@@ -56,18 +60,7 @@ CUDA out-of-memory error.
 
 ## Setup
 
-1. Copy the env template and fill in the Hugging Face token (only needed for
-   mono-file `/diarize`; stereo `/diarize`, `/transcribe`, and `/summarize`
-   all work without it):
-   ```bash
-   cp .env.example .env
-   ```
-   Get a token at https://huggingface.co/settings/tokens, and while logged
-   in accept the license on both:
-   - https://huggingface.co/pyannote/speaker-diarization-3.1
-   - https://huggingface.co/pyannote/segmentation-3.0
-
-2. Review `config.yaml` — notably `device`/`compute_type` (defaults assume an
+1. Review `config.yaml` — notably `device`/`compute_type` (defaults assume an
    NVIDIA GPU with a tight VRAM budget: `int8` compute keeps large-v3 to
    ~1.5–1.7GB) and `min_free_vram_mb` (the whole card's free VRAM, not just
    this container's usage).
@@ -78,10 +71,12 @@ CUDA out-of-memory error.
 docker compose up --build
 ```
 
-This builds and starts two containers:
-- `whisper-api` — the FastAPI service (GPU-reserved), on `http://localhost:8050`
-- `ollama` — CPU-only, auto-pulls `qwen2.5:3b` on build; `whisper-api` waits
-  for its healthcheck before starting
+This starts `whisper-api` — the FastAPI service (GPU-reserved), on
+`http://localhost:8050`.
+
+Ollama is deployed separately from [`../Summarize_Model`](../Summarize_Model).
+Start it **first** (`docker compose up -d --build` there); it creates the
+`summarize-net` network that `whisper-api` joins to reach `http://ollama:11434`.
 
 `workers` is pinned to `1` in `main.py` — the model is loaded once per
 process and the request queue/lock in `Service.py` is per-process state, not
@@ -91,5 +86,9 @@ shared across workers, so it cannot be scaled via extra uvicorn workers.
 
 - `.env` is gitignored at the project level — never commit real tokens.
 - Audio files (`*.mp3`, `*.wav`, `*.flac`) are gitignored at the repo root.
-- Ollama runs CPU-only by design; the GPU budget is fully committed to
-  whisper (see the `compute_type`/`align_device` comments in `config.yaml`).
+- Ollama (in `../Summarize_Model`) runs CPU-only by design; the GPU budget is
+  fully committed to whisper (see the `compute_type`/`align_device` comments in
+  `config.yaml`).
+- Speaker separation for mono files and the alignment models also run on CPU.
+- Not yet verified end to end: a full `docker compose up --build` and mono
+  `/diarize` against real audio.

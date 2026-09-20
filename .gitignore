@@ -26,3 +26,8 @@ $RECYCLE.BIN/
 .idea/
 *.swp
 *~
+
+*.mp3
+*.wav
+*.flac
+Debug_*.txt
