@@ -48,8 +48,10 @@ Course-SC60107-Business-Information-Technology-Management/
 ├── 02_Labs_Assignments/              # ใบงาน แบบฝึกหัด และการมอบหมายงานภาคปฏิบัติ
 │   └── AI Coaching 10 คะแนน.docx
 ├── 03_Project/                       # โครงงานประจำรายวิชา
-│   └── Whisper_Backend_API/         # FastAPI + Docker: Thai audio transcription/diarization/summarization service
-│       └── README.md                # เอกสารโครงสร้างและวิธีใช้งานของโครงงาน
+│   ├── Whisper_Backend_API/         # FastAPI + Docker: audio transcription/diarization/summarization service (ตรวจภาษาอัตโนมัติ)
+│   │   └── README.md                # เอกสารโครงสร้างและวิธีใช้งานของโครงงาน
+│   └── Summarize_Model/             # Ollama (qwen2.5:3b) แยก deploy: ใช้สรุปเนื้อหาให้ Whisper_Backend_API
+│       └── README.md                # วิธี deploy และการเชื่อมต่อกับ Whisper_Backend_API
 └── README.md                         # สารบัญหลักและภาพรวมรายวิชา
 ```
 
@@ -79,9 +81,14 @@ Course-SC60107-Business-Information-Technology-Management/
 > โครงงานประจำรายวิชา (เก็บอยู่ในโฟลเดอร์ `03_Project/`)
 
 ### 🎙️ Whisper Backend API
-- **บทบาทและหน้าที่:** บริการ Backend API สำหรับถอดเสียงพูดภาษาไทยเป็นข้อความ (Transcription) แยกผู้พูด (Speaker Diarization) และสรุปเนื้อหา (Summarization) โดยจำลองการนำเทคโนโลยี AI มาประยุกต์ใช้แก้ปัญหาทางธุรกิจจริง เช่น การถอดเทปประชุมและสรุปรายงานอัตโนมัติ
-- **เทคโนโลยีและกรอบแนวคิด:** `FastAPI, Docker, WhisperX (large-v3), pyannote.audio, Ollama (qwen2.5:3b)`
+- **บทบาทและหน้าที่:** บริการ Backend API สำหรับถอดเสียงพูดเป็นข้อความ (Transcription) โดยตรวจจับภาษาอัตโนมัติ (ทดสอบและตั้งค่าไว้สำหรับภาษาไทยและอังกฤษ) แยกผู้พูด (Speaker Diarization) และสรุปเนื้อหา (Summarization) โดยจำลองการนำเทคโนโลยี AI มาประยุกต์ใช้แก้ปัญหาทางธุรกิจจริง เช่น การถอดเทปประชุมและสรุปรายงานอัตโนมัติ
+- **เทคโนโลยีและกรอบแนวคิด:** `FastAPI, Docker, WhisperX (large-v3), SpeechBrain (ECAPA), Ollama (qwen2.5:3b)`
 - **ซอร์สโค้ดและเอกสารแผนงาน:** [โฟลเดอร์โครงงาน](03_Project/Whisper_Backend_API/) · [README โครงงาน](03_Project/Whisper_Backend_API/README.md)
+
+### 🧠 Summarize Model (Ollama)
+- **บทบาทและหน้าที่:** บริการ Ollama (CPU-only, ฝังโมเดล `qwen2.5:3b` ไว้ใน image) ที่แยก deploy ออกจาก Whisper Backend API เพื่อให้ endpoint `/summarize` เรียกใช้ผ่านเครือข่าย Docker ร่วมกัน (`summarize-net`)
+- **เทคโนโลยีและกรอบแนวคิด:** `Docker Compose, Ollama, qwen2.5:3b`
+- **ซอร์สโค้ดและเอกสารแผนงาน:** [โฟลเดอร์โครงงาน](03_Project/Summarize_Model/) · [README โครงงาน](03_Project/Summarize_Model/README.md)
 
 ---
 
