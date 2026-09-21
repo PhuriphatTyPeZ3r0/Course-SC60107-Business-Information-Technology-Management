@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { ChevronLeft, TriangleAlert } from "lucide-react";
+import { Icon } from "@/components/icon";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -57,7 +57,7 @@ function MeetingDetailContent() {
         href="/dashboard"
         className="mb-6 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
-        <ChevronLeft className="size-4" />
+        <Icon name="chevron_left" className="text-[16px]" />
         {t.common.back}
       </Link>
 
@@ -94,7 +94,7 @@ function MeetingDetailContent() {
               <Card className="glass-panel border-destructive/30">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-base text-destructive">
-                    <TriangleAlert className="size-4" />
+                    <Icon name="warning" className="text-[16px]" />
                     {t.meetingDetail.failedTitle}
                   </CardTitle>
                   <p className="text-sm text-muted-foreground">{t.meetingDetail.failedBody}</p>

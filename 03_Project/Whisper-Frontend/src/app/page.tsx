@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { AudioLines, Users, ListChecks } from "lucide-react";
+import { Icon } from "@/components/icon";
 import { buttonVariants } from "@/components/ui/button";
 import { SiteHeader } from "@/components/site-header";
 import { HeroScene } from "@/components/hero-scene";
@@ -14,9 +14,9 @@ export default function Home() {
   const mounted = useMounted();
 
   const features = [
-    { icon: AudioLines, title: t.landing.feature1Title, body: t.landing.feature1Body },
-    { icon: Users, title: t.landing.feature2Title, body: t.landing.feature2Body },
-    { icon: ListChecks, title: t.landing.feature3Title, body: t.landing.feature3Body },
+    { icon: "graphic_eq", title: t.landing.feature1Title, body: t.landing.feature1Body },
+    { icon: "group", title: t.landing.feature2Title, body: t.landing.feature2Body },
+    { icon: "checklist", title: t.landing.feature3Title, body: t.landing.feature3Body },
   ];
 
   return (
@@ -94,7 +94,7 @@ export default function Home() {
                 transition={{ duration: 0.5, delay: i * 0.1 }}
                 className="glass-panel rounded-2xl p-6"
               >
-                <feature.icon className="mb-4 size-8 text-primary" />
+                <Icon name={feature.icon} className="mb-4 text-[32px] text-primary" />
                 <h3 className="mb-2 font-semibold">{feature.title}</h3>
                 <p className="text-sm text-muted-foreground">{feature.body}</p>
               </motion.div>

@@ -1,4 +1,4 @@
-import { Info } from "lucide-react";
+import { Icon } from "@/components/icon";
 import { Badge } from "@/components/ui/badge";
 import { useLanguage } from "@/lib/i18n/context";
 import type { Transcript } from "@/lib/types";
@@ -25,7 +25,7 @@ export function TranscriptView({ transcript }: { transcript: Transcript }) {
     <div className="space-y-5">
       {transcript.diarizationMethod === "single-speaker-fallback" && (
         <div className="flex items-start gap-2 rounded-lg border border-muted-foreground/20 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-          <Info className="mt-0.5 size-3.5 shrink-0" />
+          <Icon name="info" className="mt-0.5 text-[14px] shrink-0" />
           <span>{t.meetingDetail.singleSpeakerFallback}</span>
         </div>
       )}

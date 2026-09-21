@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Users } from "lucide-react";
+import { Icon } from "@/components/icon";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -94,7 +94,7 @@ export default function DashboardPage() {
                   <CardContent className="space-y-2 text-sm text-muted-foreground">
                     <p>{dateFormatter.format(new Date(meeting.createdAt))}</p>
                     <div className="flex items-center gap-1.5">
-                      <Users className="size-3.5" />
+                      <Icon name="group" className="text-[14px]" />
                       {meeting.participantCount} {t.dashboard.participants}
                     </div>
                     {meeting.actionItemOpenCount > 0 && (

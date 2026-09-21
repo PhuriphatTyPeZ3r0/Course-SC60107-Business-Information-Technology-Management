@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { UploadCloud } from "lucide-react";
+import { Icon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -61,7 +61,7 @@ export default function NewMeetingPage() {
                 htmlFor="file"
                 className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed border-white/20 px-4 py-8 text-center text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
               >
-                <UploadCloud className="size-6" />
+                <Icon name="upload" className="text-[24px]" />
                 {file ? file.name : t.newMeeting.fileLabel}
               </label>
               <input

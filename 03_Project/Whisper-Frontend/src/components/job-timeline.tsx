@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Check, Loader2 } from "lucide-react";
+import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n/context";
 import type { Job } from "@/lib/types";
@@ -22,8 +22,10 @@ export function JobTimeline({ jobs }: { jobs: Job[] }) {
               job.status === "failed" && "border-destructive bg-destructive/20 text-destructive",
             )}
           >
-            {job.status === "completed" && <Check className="size-4" />}
-            {job.status === "running" && <Loader2 className="size-4 animate-spin" />}
+            {job.status === "completed" && <Icon name="check" className="text-[16px]" />}
+            {job.status === "running" && (
+              <Icon name="progress_activity" className="animate-spin text-[16px]" />
+            )}
             {job.status === "queued" && <span className="size-2 rounded-full bg-current" />}
           </div>
           <div className="flex-1">

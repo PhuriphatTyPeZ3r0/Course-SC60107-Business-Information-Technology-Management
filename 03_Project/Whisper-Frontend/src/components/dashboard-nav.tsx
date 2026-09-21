@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LogOut } from "lucide-react";
+import { Icon } from "@/components/icon";
 import { buttonVariants } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -45,7 +45,7 @@ export function DashboardNav() {
                   router.push("/");
                 }}
               >
-                <LogOut className="mr-2 size-4" />
+                <Icon name="logout" className="mr-2 text-[16px]" />
                 {t.nav.logout}
               </DropdownMenuItem>
             </DropdownMenuContent>
