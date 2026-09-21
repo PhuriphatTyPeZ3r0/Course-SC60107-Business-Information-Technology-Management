@@ -13,11 +13,11 @@ import type { ActionItemStatus, Env } from "./types";
 // frontend doesn't send its token back on later requests either, so
 // there's no bearer-token verification to implement here.
 //
-// No framework (Hono etc.) on purpose: this Worker is deployed via the raw
-// Cloudflare API (multipart script upload) rather than `wrangler deploy`
-// (see README's "Deployment" note), so keeping the bundle to just this
+// No framework (Hono etc.) on purpose: keeping the bundle to just this
 // project's own code - no bundled dependency tree - matters for how it's
-// shipped, not just size.
+// shipped, not just size. (Originally deployed via the raw Cloudflare API;
+// now deployed with `npm run deploy` / `wrangler deploy` now that wrangler
+// is authenticated on the dev machine - see README's "Deployment" note.)
 
 const VALID_ACTION_ITEM_STATUSES: ActionItemStatus[] = ["open", "in_progress", "done", "cancelled"];
 const ALLOWED_EXTENSIONS = [".wav", ".mp3", ".m4a", ".flac", ".ogg", ".webm"];
@@ -40,9 +40,20 @@ interface LoginBody {
 interface SignupBody extends LoginBody {
   displayName?: string;
 }
-interface ActionItemStatusBody {
+interface ActionItemPatchBody {
   meetingId?: string;
   status?: string;
+  description?: string;
+  assigneeName?: string | null;
+  dueDate?: string | null;
+}
+interface ActionItemCreateBody {
+  description?: string;
+  assigneeName?: string | null;
+  dueDate?: string | null;
+}
+interface MeetingPatchBody {
+  title?: string;
 }
 
 async function readJson<T>(request: Request): Promise<T> {
@@ -126,13 +137,58 @@ async function handleCreateMeeting(request: Request, env: Env, origin: string): 
   return json({ meeting }, 201, origin);
 }
 
+async function handlePatchMeeting(meetingId: string, request: Request, env: Env, origin: string): Promise<Response> {
+  const body = await readJson<MeetingPatchBody>(request);
+  const title = body.title?.trim();
+  if (!title) return errorJson("INVALID_REQUEST", "Title is required", 400, origin);
+
+  await db.updateMeetingTitle(env.DB, meetingId, title);
+  const meeting = await db.getMeetingFull(env.DB, meetingId);
+  if (!meeting) return errorJson("NOT_FOUND", "Meeting not found", 404, origin);
+  return json({ meeting }, 200, origin);
+}
+
+async function handleCreateActionItem(
+  meetingId: string,
+  request: Request,
+  env: Env,
+  origin: string,
+): Promise<Response> {
+  const body = await readJson<ActionItemCreateBody>(request);
+  const description = body.description?.trim();
+  if (!description) return errorJson("INVALID_REQUEST", "Description is required", 400, origin);
+
+  const meeting = await db.getMeetingFull(env.DB, meetingId);
+  if (!meeting) return errorJson("NOT_FOUND", "Meeting not found", 404, origin);
+
+  const actionItem = await db.createActionItem(env.DB, meetingId, {
+    description,
+    assigneeName: body.assigneeName?.trim() || null,
+    dueDate: body.dueDate || null,
+  });
+  return json({ actionItem }, 201, origin);
+}
+
 async function handlePatchActionItem(actionItemId: string, request: Request, env: Env, origin: string): Promise<Response> {
-  const body = await readJson<ActionItemStatusBody>(request);
-  if (!body.status || !VALID_ACTION_ITEM_STATUSES.includes(body.status as ActionItemStatus)) {
+  const body = await readJson<ActionItemPatchBody>(request);
+  if (body.status !== undefined && !VALID_ACTION_ITEM_STATUSES.includes(body.status as ActionItemStatus)) {
     return errorJson("INVALID_STATUS", `Invalid status: ${body.status}`, 400, origin);
   }
+  if (
+    body.description === undefined &&
+    body.assigneeName === undefined &&
+    body.dueDate === undefined &&
+    body.status === undefined
+  ) {
+    return errorJson("INVALID_REQUEST", "No fields to update", 400, origin);
+  }
 
-  const actionItem = await db.updateActionItemStatus(env.DB, actionItemId, body.status as ActionItemStatus);
+  const actionItem = await db.updateActionItem(env.DB, actionItemId, {
+    description: body.description?.trim(),
+    assigneeName: body.assigneeName === undefined ? undefined : body.assigneeName?.trim() || null,
+    dueDate: body.dueDate,
+    status: body.status as ActionItemStatus | undefined,
+  });
   if (!actionItem) return errorJson("NOT_FOUND", "Action item not found", 404, origin);
   return json({ actionItem }, 200, origin);
 }
@@ -166,6 +222,12 @@ export default {
 
       const meetingMatch = pathname.match(/^\/api\/meetings\/([^/]+)$/);
       if (method === "GET" && meetingMatch) return await handleGetMeeting(meetingMatch[1], env, origin);
+      if (method === "PATCH" && meetingMatch) return await handlePatchMeeting(meetingMatch[1], request, env, origin);
+
+      const meetingActionItemsMatch = pathname.match(/^\/api\/meetings\/([^/]+)\/action-items$/);
+      if (method === "POST" && meetingActionItemsMatch) {
+        return await handleCreateActionItem(meetingActionItemsMatch[1], request, env, origin);
+      }
 
       const actionItemMatch = pathname.match(/^\/api\/action-items\/([^/]+)$/);
       if (method === "PATCH" && actionItemMatch) {

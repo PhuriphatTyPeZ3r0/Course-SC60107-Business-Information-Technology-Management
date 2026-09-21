@@ -357,8 +357,8 @@ async function fetchMeetingFullFromRow(db: D1Database, meeting: MeetingRow): Pro
 
   const { results: actionItemRows } = await db
     .prepare(
-      "SELECT a.action_item_id, a.description, a.due_date, a.status, p.display_name AS assignee_name " +
-        "FROM action_item a LEFT JOIN participant p ON p.participant_id = a.assignee_participant_id " +
+      "SELECT a.action_item_id, a.description, a.due_date, a.status, a.assignee_name " +
+        "FROM action_item a " +
         "WHERE a.meeting_id = ? AND a.deleted_at IS NULL ORDER BY a.due_date IS NULL, a.due_date, a.created_at",
     )
     .bind(meetingId)
@@ -419,26 +419,88 @@ export async function listTeamMeetings(db: D1Database): Promise<Meeting[]> {
   return Promise.all(results.map((row) => fetchMeetingFullFromRow(db, row)));
 }
 
-export async function updateActionItemStatus(
-  db: D1Database,
-  actionItemId: string,
-  status: ActionItemStatus,
-): Promise<ActionItem | null> {
-  await db
-    .prepare("UPDATE action_item SET status = ?, updated_at = ? WHERE action_item_id = ?")
-    .bind(status, now(), actionItemId)
-    .run();
+async function fetchActionItemById(db: D1Database, actionItemId: string): Promise<ActionItem | null> {
   const row = await db
-    .prepare("SELECT action_item_id, meeting_id, description, due_date, status FROM action_item WHERE action_item_id = ?")
+    .prepare(
+      "SELECT action_item_id, meeting_id, description, due_date, status, assignee_name " +
+        "FROM action_item WHERE action_item_id = ? AND deleted_at IS NULL",
+    )
     .bind(actionItemId)
-    .first<{ action_item_id: number; meeting_id: string; description: string; due_date: string | null; status: ActionItemStatus }>();
+    .first<{
+      action_item_id: number;
+      meeting_id: string;
+      description: string;
+      due_date: string | null;
+      status: ActionItemStatus;
+      assignee_name: string | null;
+    }>();
   if (!row) return null;
   return {
     id: String(row.action_item_id),
     meetingId: row.meeting_id,
     description: row.description,
-    assigneeName: null,
+    assigneeName: row.assignee_name,
     dueDate: row.due_date,
     status: row.status,
   };
+}
+
+export async function createActionItem(
+  db: D1Database,
+  meetingId: string,
+  input: { description: string; assigneeName: string | null; dueDate: string | null },
+): Promise<ActionItem> {
+  const ts = now();
+  const result = await db
+    .prepare(
+      "INSERT INTO action_item (meeting_id, description, assignee_name, due_date, status, created_at, updated_at) " +
+        "VALUES (?, ?, ?, ?, 'open', ?, ?)",
+    )
+    .bind(meetingId, input.description, input.assigneeName, input.dueDate, ts, ts)
+    .run();
+  const actionItem = await fetchActionItemById(db, String(result.meta.last_row_id));
+  if (!actionItem) throw new Error("createActionItem: insert succeeded but row not found");
+  return actionItem;
+}
+
+export async function updateActionItem(
+  db: D1Database,
+  actionItemId: string,
+  patch: { description?: string; assigneeName?: string | null; dueDate?: string | null; status?: ActionItemStatus },
+): Promise<ActionItem | null> {
+  const fields: string[] = [];
+  const values: unknown[] = [];
+  if (patch.description !== undefined) {
+    fields.push("description = ?");
+    values.push(patch.description);
+  }
+  if (patch.assigneeName !== undefined) {
+    fields.push("assignee_name = ?");
+    values.push(patch.assigneeName);
+  }
+  if (patch.dueDate !== undefined) {
+    fields.push("due_date = ?");
+    values.push(patch.dueDate);
+  }
+  if (patch.status !== undefined) {
+    fields.push("status = ?");
+    values.push(patch.status);
+  }
+  if (fields.length === 0) return fetchActionItemById(db, actionItemId);
+
+  fields.push("updated_at = ?");
+  values.push(now());
+  values.push(actionItemId);
+  await db
+    .prepare(`UPDATE action_item SET ${fields.join(", ")} WHERE action_item_id = ?`)
+    .bind(...values)
+    .run();
+  return fetchActionItemById(db, actionItemId);
+}
+
+export async function updateMeetingTitle(db: D1Database, meetingId: string, title: string): Promise<void> {
+  await db
+    .prepare("UPDATE meeting SET title = ?, updated_at = ? WHERE meeting_id = ?")
+    .bind(title, now(), meetingId)
+    .run();
 }
