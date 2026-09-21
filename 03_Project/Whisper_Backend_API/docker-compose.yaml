@@ -8,14 +8,12 @@ services:
       - "8050:8050"
     restart: unless-stopped
     environment:
-      - OLLAMA_BASE_URL=http://ollama:11434
+      # Summarizer key (config.yaml `summarizer: gemini`); set it in .env, see .env.example.
+      - GEMINI_API_KEY=${GEMINI_API_KEY:?set GEMINI_API_KEY in .env}
       - DATABASE_URL=postgresql://whisper:${POSTGRES_PASSWORD:-whisper}@postgres:5432/whisper_db
       # Frontend origin allowed to call this API cross-origin (see
       # Process/Service.py's CORSMiddleware). Override for a deployed frontend.
       - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3000}
-    networks:
-      - default
-      - summarize-net
     depends_on:
       postgres:
         condition: service_healthy
@@ -30,9 +28,7 @@ services:
   # Backs the meetings/teams/jobs/action-items persistence layer the
   # frontend expects (see FRONTEND_HANDOFF.md) - schema.sql/stored_procedures.sql
   # are the same Postgres design kept as the Cloudflare port's local-dev
-  # parallel path (see CLAUDE.md), applied here for real. On the `default`
-  # network (unlike ollama, which lives in ../Summarize_Model's compose
-  # project and is reached over the external summarize-net network instead).
+  # parallel path (see CLAUDE.md), applied here for real.
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -58,10 +54,3 @@ services:
 
 volumes:
   whisper-db-data:
-
-# Ollama is deployed separately from ../Summarize_Model (start it first); this
-# joins its network so OLLAMA_BASE_URL=http://ollama:11434 still resolves.
-networks:
-  summarize-net:
-    external: true
-    name: summarize-net

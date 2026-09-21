@@ -13,7 +13,7 @@ Reference for calling the API. For deployment and project structure see [README.
 | GET    | `/health`     | Service status                                                 |
 | POST   | `/transcribe` | Transcript with word-level timestamps                          |
 | POST   | `/diarize`    | Transcript split by speaker (A, B, C, ...)                     |
-| POST   | `/summarize`  | Transcript plus a short summary (via the separate Ollama service) |
+| POST   | `/summarize`  | Transcript plus a short summary (via the Gemini API) |
 
 ## Input rules (all upload endpoints)
 
@@ -130,7 +130,7 @@ curl -F "file=@call.mp3" http://localhost:8050/diarize
 
 ## `POST /summarize`
 
-Transcribes the audio (segment-level, no alignment), then asks the Ollama service (`qwen2.5:3b` by default) for a short summary. The prompt is in Thai, so summaries come back in Thai.
+Transcribes the audio (segment-level, no alignment), then asks the Gemini API (`gemini-2.5-flash` by default, see `gemini_model` in `config.yaml`) for a short summary. The prompt is in Thai, so summaries come back in Thai.
 
 **Request:** `file` = the audio file.
 
@@ -144,7 +144,7 @@ Transcribes the audio (segment-level, no alignment), then asks the Ollama servic
 }
 ```
 
-Requires the `Summarize_Model` service to be running. If it is not reachable: `502 SUMMARIZER_UNAVAILABLE`.
+Requires `GEMINI_API_KEY` to be set. If Gemini cannot be reached or rejects the request: `502 SUMMARIZER_UNAVAILABLE`.
 
 ```bash
 curl -F "file=@call.mp3" http://localhost:8050/summarize
@@ -169,7 +169,7 @@ Messages may be in Thai or English; match on `code`, not `message`.
 | 415  | `UNSUPPORTED_FORMAT`          | Extension not in `allowed_extensions`                              |
 | 422  | `UNSUPPORTED_CHANNEL_LAYOUT`  | `/diarize` given audio with 3 or more channels                     |
 | 429  | `QUEUE_FULL`                  | Request queue is full; retry later                                 |
-| 502  | `SUMMARIZER_UNAVAILABLE`      | `/summarize` could not reach Ollama                                |
+| 502  | `SUMMARIZER_UNAVAILABLE`      | `/summarize` could not reach Gemini                                |
 | 503  | `MODEL_NOT_READY`             | Models are not loaded yet                                          |
 | 503  | `VRAM_EXHAUSTED`              | Free GPU memory below `min_free_vram_mb`; retry later              |
 | 503  | `MONO_DIARIZATION_UNAVAILABLE`| The speaker-separation model could not be loaded (mono `/diarize`) |

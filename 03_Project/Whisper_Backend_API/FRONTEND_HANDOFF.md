@@ -8,20 +8,16 @@ eventually need to replace.
 
 Also reflects the backend rewrite pulled in from the team afterward
 (Service_Dev branch): diarization moved from pyannote to SpeechBrain
-(no HF token needed anymore, any language), and Ollama moved out to its
-own `03_Project/Summarize_Model` project joined over an external Docker
-network. See `API_SPEC.md` for the transcribe/diarize/summarize contract
+(no HF token needed anymore, any language), and summarization now uses
+the Gemini API. See `API_SPEC.md` for the transcribe/diarize/summarize contract
 itself — this doc only covers the new persistence/meetings layer.
 
 ## How to run the integrated stack
 
 ```bash
-cd 03_Project/Summarize_Model
-docker compose up -d --build   # start this first - creates the summarize-net network
-
-cd ../Whisper_Backend_API
-cp .env.example .env           # defaults are fine for local dev
-docker compose up --build      # postgres + whisper-api (joins summarize-net)
+cd 03_Project/Whisper_Backend_API
+cp .env.example .env           # then set GEMINI_API_KEY in .env
+docker compose up --build      # postgres + whisper-api
 ```
 
 ```bash
@@ -61,7 +57,7 @@ no other frontend code changes needed.
   `tbl_job` rows (`transcribe`/`diarize`/`summarize`, all `queued`), then
   runs `_run_meeting_pipeline()` as a FastAPI background task — the actual
   WhisperX transcription, stereo-split-or-SpeechBrain diarization, and
-  Ollama summarization, updating each job's status in Postgres as it
+  Gemini summarization, updating each job's status in Postgres as it
   progresses. This is the same GPU-serialization (`BoundedSerialGate`) and
   stereo/mono branching the existing `/transcribe`, `/diarize`,
   `/summarize` endpoints already use (mono uses `transcribe_with_chars` +
@@ -91,7 +87,7 @@ no other frontend code changes needed.
   (`A`, `B`, `C`, ... for both stereo and mono now) turned into
   `tbl_participant` rows named after the label itself. Real named
   participants would need a "who is speaker A" UI that doesn't exist yet.
-- **No action-item extraction.** The Ollama summarizer produces a prose
+- **No action-item extraction.** The Gemini summarizer produces a prose
   summary only — nothing parses it into structured action items, and the
   frontend has no "add action item" UI either. Real meetings currently
   finish with an empty action-items list (the frontend's empty state

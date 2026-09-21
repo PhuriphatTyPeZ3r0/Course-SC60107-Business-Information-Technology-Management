@@ -31,3 +31,5 @@ $RECYCLE.BIN/
 *.wav
 *.flac
 Debug_*.txt
+FIX_REPORT.md
+Test_Deploy/

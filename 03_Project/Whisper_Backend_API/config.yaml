@@ -29,7 +29,20 @@ batch_size: 16
 # keep each decode well inside what large-v3 (int8) handles reliably.
 chunk_size_sec: 10
 
-# Alignment (wav2vec2) and Ollama summarization run on CPU on purpose: the
+# Repeatable output. whisperx's default decoding retries a failed chunk at
+# temperatures 0.2 .. 1.0, which samples randomly, so the same audio could
+# transcribe differently run to run. Pinning temperatures to [0.0] keeps the
+# decode greedy/beam-only (no random sampling); `seed` re-seeds the remaining
+# RNGs before each request. Trade-off: a chunk that would have been rescued by
+# a random retry is now kept as the first decode. Remove asr_options / seed
+# (or set seed to null) to go back to whisperx's defaults.
+asr_options:
+  temperatures: [0.0]
+  beam_size: 5
+  condition_on_previous_text: false
+seed: 99
+
+# Alignment (wav2vec2) runs on CPU on purpose: the
 # whole card only has a few GB free after OS/desktop overhead, and whisper
 # itself is the only model worth spending that on.
 align_device: cpu
@@ -52,11 +65,9 @@ min_free_vram_mb: 300
 host: 0.0.0.0
 port: 8050
 
-# /summarize talks to a separate Ollama container (see docker-compose.yaml).
-# OLLAMA_BASE_URL env var overrides this if set. qwen2.5:3b (not 7b) because
-# Ollama runs CPU-only here to stay inside the VRAM budget.
-ollama_base_url: http://ollama:11434
-ollama_model: qwen2.5:3b
+# /summarize uses the Gemini API. The key comes from the GEMINI_API_KEY env
+# var (see .env.example), never this file.
+gemini_model: gemini-2.5-flash
 
 # Mono-file speaker separation in /diarize (stereo files are split by channel
 # instead). Uses a public SpeechBrain model, no token needed. 2 = a two-party

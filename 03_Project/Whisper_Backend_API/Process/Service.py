@@ -28,7 +28,7 @@ from Process.errors import (
     VramExhaustedError,
 )
 from Process.Process import WhisperPipeline
-from Process.summarize import OllamaSummarizer
+from Process.summarize import GeminiSummarizer, build_summarizer
 from Process.vram_guard import free_vram_mb
 from utils.load_utils import load_config, load_model
 
@@ -38,7 +38,7 @@ logger = logging.getLogger("whisper_api")
 CONFIG_PATH = os.environ.get("CONFIG_PATH", "config.yaml")
 
 pipeline: WhisperPipeline | None = None
-summarizer: OllamaSummarizer | None = None
+summarizer: GeminiSummarizer | None = None
 diarization_pipeline: LazyDiarizationPipeline | None = None
 config: dict = {}
 
@@ -101,7 +101,9 @@ async def lifespan(app: FastAPI):
         "Loading whisper model '%s' on %s (compute_type=%s) ...",
         config["model_name"], device, config.get("compute_type", "int8"),
     )
-    model = load_model(config["model_name"], device, config.get("compute_type", "int8"))
+    model = load_model(
+        config["model_name"], device, config.get("compute_type", "int8"), asr_options=config.get("asr_options")
+    )
 
     pipeline = WhisperPipeline(
         model=model,
@@ -110,6 +112,7 @@ async def lifespan(app: FastAPI):
         align_device=align_device,
         batch_size=config.get("batch_size", 16),
         chunk_size_sec=config.get("chunk_size_sec", 30),
+        seed=config.get("seed"),
     )
     # Aligners for other languages load on first use; these are just ready up front.
     for language in config.get("warm_align_languages", []):
@@ -119,10 +122,7 @@ async def lifespan(app: FastAPI):
         config.get("max_queue_size", 10), min_free_vram_mb=config.get("min_free_vram_mb")
     )
 
-    summarizer = OllamaSummarizer(
-        base_url=os.environ.get("OLLAMA_BASE_URL", config.get("ollama_base_url", "http://ollama:11434")),
-        model=config.get("ollama_model", "qwen2.5:3b"),
-    )
+    summarizer = build_summarizer(config)
 
     # Just constructs the wrapper; the SpeechBrain speaker model loads lazily
     # on the first mono /diarize request.
@@ -461,7 +461,7 @@ async def _run_meeting_pipeline(meeting_id: str, job_ids: dict[str, str], tmp_pa
 
         await db.set_job_status(job_ids["summarize"], "running")
         summary_text = await summarizer.summarize(full_text)
-        await db.save_summary(job_ids["summarize"], summary_text, config.get("ollama_model", "qwen2.5:3b"))
+        await db.save_summary(job_ids["summarize"], summary_text, summarizer.model)
         await db.set_job_status(job_ids["summarize"], "completed")
 
         await db.set_meeting_status(meeting_id, "completed")

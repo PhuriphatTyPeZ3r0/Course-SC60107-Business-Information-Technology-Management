@@ -3,6 +3,7 @@ import logging
 import whisperx
 
 from Process.errors import AudioTooLongError
+from utils.load_utils import seed_everything
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,7 @@ class WhisperPipeline:
         align_device: str,
         batch_size: int = 16,
         chunk_size_sec: int = 30,
+        seed: int | None = None,
     ):
         self.model = model
         # Language code -> wav2vec2 model name, for languages whisperx has no
@@ -40,12 +42,18 @@ class WhisperPipeline:
         self.batch_size = batch_size
         # Longest audio slice Whisper decodes in one go; see config.yaml's chunk_size_sec.
         self.chunk_size_sec = chunk_size_sec
+        # Re-applied before every request (see _transcribe_raw) so RNG state left
+        # over from earlier requests can't change this one's output. None = don't seed.
+        self.seed = seed
 
     def _transcribe_raw(self, audio_path: str, max_duration_sec: float | None):
         audio = whisperx.load_audio(audio_path)
         duration_sec = len(audio) / SAMPLE_RATE
         if max_duration_sec is not None and duration_sec > max_duration_sec:
             raise AudioTooLongError(duration_sec, max_duration_sec)
+
+        if self.seed is not None:
+            seed_everything(self.seed)
 
         # No `language=` kwarg on purpose: the language is detected per
         # request, so any language Whisper knows can be sent in.

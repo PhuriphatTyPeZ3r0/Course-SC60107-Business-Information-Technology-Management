@@ -4,8 +4,8 @@ FastAPI backend that transcribes, diarizes, and summarizes audio in any language
 warmed up by default). Wraps
 [WhisperX](https://github.com/m-bain/whisperX) (large-v3, word-level alignment)
 for transcription, [SpeechBrain](https://speechbrain.github.io/) (ECAPA speaker embeddings)
-for mono-file speaker diarization, and a local [Ollama](https://ollama.com/)
-model for summarization (deployed separately from `../Summarize_Model`) —
+for mono-file speaker diarization, and the [Gemini API](https://ai.google.dev/)
+for summarization —
 packaged as Docker containers for a single GPU with a tight VRAM budget.
 
 ## Structure
@@ -16,7 +16,7 @@ Whisper_Backend_API/
 ├── config.yaml                  # Model, device, and serving configuration
 ├── API_SPEC.md                  # API reference: endpoints, schemas, errors, examples
 ├── requirements.txt             # Python dependencies
-├── docker-compose.yaml          # whisper-api service (joins Summarize_Model's network)
+├── docker-compose.yaml          # whisper-api service + postgres
 ├── Dockerfile                   # whisper-api image
 ├── .dockerignore
 ├── Process/
@@ -25,7 +25,7 @@ Whisper_Backend_API/
 │   ├── diarization_pipeline.py  # Lazy-loaded SpeechBrain pipeline (mono-file diarization)
 │   ├── diarize.py               # Merges channel/speaker turns into a diarized transcript
 │   ├── audio_channels.py        # Channel probing and stereo-channel splitting
-│   ├── summarize.py             # OllamaSummarizer: talks to the Ollama container
+│   ├── summarize.py             # GeminiSummarizer: calls the Gemini API
 │   ├── vram_guard.py            # Free-VRAM check used to admission-gate GPU requests
 │   └── errors.py                # Typed API errors mapped to HTTP status codes
 ├── scripts/
@@ -48,7 +48,7 @@ Whisper_Backend_API/
   appearance). Each segment is returned as `start`, `end`, `speaker`, `text`.
   Anything else (3+ channels) is rejected.
 - **`POST /summarize`** — transcribes, then summarizes the text via the
-  Ollama container.
+  Gemini API.
 - **`GET /health`** — `{"status": "ok"}` once the models are loaded,
   `{"status": "loading"}` before that.
 
@@ -77,9 +77,8 @@ docker compose up --build
 This starts `whisper-api` — the FastAPI service (GPU-reserved), on
 `http://localhost:8050`.
 
-Ollama is deployed separately from [`../Summarize_Model`](../Summarize_Model).
-Start it **first** (`docker compose up -d --build` there); it creates the
-`summarize-net` network that `whisper-api` joins to reach `http://ollama:11434`.
+Summarization calls the Gemini API, so set `GEMINI_API_KEY` in `.env`
+(see `.env.example`) before starting.
 
 `workers` is pinned to `1` in `main.py` — the model is loaded once per
 process and the request queue/lock in `Service.py` is per-process state, not
@@ -89,9 +88,9 @@ shared across workers, so it cannot be scaled via extra uvicorn workers.
 
 - `.env` is gitignored at the project level — never commit real tokens.
 - Audio files (`*.mp3`, `*.wav`, `*.flac`) are gitignored at the repo root.
-- Ollama (in `../Summarize_Model`) runs CPU-only by design; the GPU budget is
-  fully committed to whisper (see the `compute_type`/`align_device` comments in
-  `config.yaml`).
+- The GPU budget is fully committed to whisper (see the
+  `compute_type`/`align_device` comments in `config.yaml`); summarization runs
+  remotely on Gemini.
 - Speaker separation for mono files and the alignment models also run on CPU.
 - Not yet verified end to end: a full `docker compose up --build` and mono
   `/diarize` against real audio.
