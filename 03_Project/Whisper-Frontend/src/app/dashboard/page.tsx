@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { MeetingStatusBadge } from "@/components/status-badge";
 import { useLanguage } from "@/lib/i18n/context";
 import { api } from "@/lib/api/client";
+import { glassSpring } from "@/lib/motion";
 import type { MeetingSummaryView } from "@/lib/types";
 
 export default function DashboardPage() {
@@ -81,7 +82,7 @@ export default function DashboardPage() {
               key={meeting.id}
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: i * 0.05 }}
+              transition={{ ...glassSpring, delay: i * 0.05 }}
             >
               <Link href={`/dashboard/meeting?id=${meeting.id}`}>
                 <Card className="glass-panel h-full transition-colors hover:border-primary/40">

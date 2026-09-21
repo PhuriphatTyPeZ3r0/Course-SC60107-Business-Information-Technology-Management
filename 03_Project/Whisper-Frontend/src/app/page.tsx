@@ -8,6 +8,7 @@ import { SiteHeader } from "@/components/site-header";
 import { HeroScene } from "@/components/hero-scene";
 import { useLanguage } from "@/lib/i18n/context";
 import { useMounted } from "@/lib/hooks/use-mounted";
+import { glassSpring } from "@/lib/motion";
 
 export default function Home() {
   const { t } = useLanguage();
@@ -91,7 +92,7 @@ export default function Home() {
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: i * 0.1 }}
+                transition={{ ...glassSpring, delay: i * 0.1 }}
                 className="glass-panel rounded-2xl p-6"
               >
                 <Icon name={feature.icon} className="mb-4 text-[32px] text-primary" />
