@@ -78,8 +78,15 @@ export const dictionaries = {
       assignee: "ผู้รับผิดชอบ",
       singleSpeakerFallback:
         "ตรวจพบผู้พูดเพียงคนเดียว — ระบบแยกเสียงอาจไม่รองรับไฟล์นี้ (รองรับเฉพาะ WAV แบบสเตอริโอ) ลองอัปโหลดไฟล์ WAV 2 แชนแนลหากต้องการแยกผู้พูด",
+      addActionItem: "เพิ่มรายการงาน",
+      editActionItem: "แก้ไขรายการงาน",
+      descriptionLabel: "รายละเอียด",
+      descriptionPlaceholder: "ต้องทำอะไร?",
+      assigneePlaceholder: "ชื่อผู้รับผิดชอบ (ไม่บังคับ)",
+      dueDateLabel: "วันครบกำหนด",
+      renameMeetingLabel: "แก้ไขชื่อการประชุม",
     },
-    common: { back: "ย้อนกลับ" },
+    common: { back: "ย้อนกลับ", save: "บันทึก", cancel: "ยกเลิก" },
   },
   en: {
     brand: "Whisper",
@@ -158,8 +165,15 @@ export const dictionaries = {
       assignee: "Assignee",
       singleSpeakerFallback:
         "Only one speaker was detected — this file format may not support speaker separation (stereo WAV only). Try uploading a 2-channel WAV to split speakers.",
+      addActionItem: "Add action item",
+      editActionItem: "Edit action item",
+      descriptionLabel: "Description",
+      descriptionPlaceholder: "What needs to be done?",
+      assigneePlaceholder: "Assignee name (optional)",
+      dueDateLabel: "Due date",
+      renameMeetingLabel: "Rename meeting",
     },
-    common: { back: "Back" },
+    common: { back: "Back", save: "Save", cancel: "Cancel" },
   },
 } as const;
 

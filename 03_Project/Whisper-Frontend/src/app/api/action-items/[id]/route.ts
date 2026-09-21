@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { updateActionItemStatus } from "@/lib/server/mockStore";
+import { updateActionItem } from "@/lib/server/mockStore";
 import type { ActionItemStatus } from "@/lib/types";
 
 const VALID_STATUSES: ActionItemStatus[] = ["open", "in_progress", "done", "cancelled"];
@@ -13,11 +13,24 @@ export async function PATCH(
   const meetingId = typeof body?.meetingId === "string" ? body.meetingId : "";
   const status = body?.status as ActionItemStatus | undefined;
 
-  if (!meetingId || !status || !VALID_STATUSES.includes(status)) {
-    return NextResponse.json({ error: "meetingId and a valid status are required" }, { status: 400 });
+  if (!meetingId) {
+    return NextResponse.json({ error: "meetingId is required" }, { status: 400 });
+  }
+  if (status !== undefined && !VALID_STATUSES.includes(status)) {
+    return NextResponse.json({ error: "Invalid status" }, { status: 400 });
   }
 
-  const item = updateActionItemStatus(meetingId, id, status);
+  const item = updateActionItem(meetingId, id, {
+    description: typeof body?.description === "string" ? body.description.trim() : undefined,
+    assigneeName:
+      body?.assigneeName === undefined
+        ? undefined
+        : typeof body.assigneeName === "string"
+          ? body.assigneeName.trim() || null
+          : null,
+    dueDate: body?.dueDate === undefined ? undefined : (body.dueDate ?? null),
+    status,
+  });
   if (!item) {
     return NextResponse.json({ error: "Action item not found" }, { status: 404 });
   }

@@ -8,6 +8,7 @@ import { Icon } from "@/components/icon";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
 import { MeetingStatusBadge } from "@/components/status-badge";
 import { JobTimeline } from "@/components/job-timeline";
 import { TranscriptView } from "@/components/transcript-view";
@@ -16,6 +17,68 @@ import { useLanguage } from "@/lib/i18n/context";
 import { useMounted } from "@/lib/hooks/use-mounted";
 import { api } from "@/lib/api/client";
 import type { Meeting } from "@/lib/types";
+
+function EditableMeetingTitle({
+  meeting,
+  onRenamed,
+}: {
+  meeting: Meeting;
+  onRenamed: (title: string) => void;
+}) {
+  const { t } = useLanguage();
+  const [isEditing, setIsEditing] = useState(false);
+  const [title, setTitle] = useState(meeting.title);
+
+  async function save() {
+    const trimmed = title.trim();
+    setIsEditing(false);
+    if (!trimmed || trimmed === meeting.title) {
+      setTitle(meeting.title);
+      return;
+    }
+    onRenamed(trimmed);
+    try {
+      await api.renameMeeting(meeting.id, trimmed);
+    } catch {
+      onRenamed(meeting.title);
+      setTitle(meeting.title);
+    }
+  }
+
+  if (isEditing) {
+    return (
+      <Input
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") save();
+          if (e.key === "Escape") {
+            setTitle(meeting.title);
+            setIsEditing(false);
+          }
+        }}
+        autoFocus
+        className="h-auto text-2xl font-semibold tracking-tight"
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setIsEditing(true)}
+      aria-label={t.meetingDetail.renameMeetingLabel}
+      className="group flex items-center gap-2 text-left"
+    >
+      <h1 className="text-2xl font-semibold tracking-tight">{meeting.title}</h1>
+      <Icon
+        name="edit"
+        className="text-[16px] text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
+      />
+    </button>
+  );
+}
 
 // A query-param route (?id=...), not a dynamic segment ([id]/page.tsx): this
 // app is deployed as a static export (Cloudflare Pages has no Next.js SSR
@@ -71,7 +134,10 @@ function MeetingDetailContent() {
       {meeting && (
         <>
           <div className="mb-8 flex items-center justify-between gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight">{meeting.title}</h1>
+            <EditableMeetingTitle
+              meeting={meeting}
+              onRenamed={(title) => setMeeting((m) => (m ? { ...m, title } : m))}
+            />
             <MeetingStatusBadge status={meeting.status} />
           </div>
 

@@ -249,16 +249,51 @@ export function createMeeting(input: { title: string; sourceFileName: string | n
   return materialize(meeting);
 }
 
-export function updateActionItemStatus(
+export function renameMeeting(id: string, title: string): Meeting | null {
+  const store = getStore();
+  const meeting = store.meetings.get(id);
+  if (!meeting) return null;
+  meeting.title = title;
+  return materialize(meeting);
+}
+
+export function createActionItem(
+  meetingId: string,
+  input: { description: string; assigneeName: string | null; dueDate: string | null },
+): ActionItem | null {
+  const store = getStore();
+  const meeting = store.meetings.get(meetingId);
+  if (!meeting) return null;
+  const item: ActionItem = {
+    id: makeId("action"),
+    meetingId,
+    description: input.description,
+    assigneeName: input.assigneeName,
+    dueDate: input.dueDate,
+    status: "open",
+  };
+  meeting.actionItems.push(item);
+  return item;
+}
+
+export function updateActionItem(
   meetingId: string,
   actionItemId: string,
-  status: ActionItem["status"],
+  patch: {
+    description?: string;
+    assigneeName?: string | null;
+    dueDate?: string | null;
+    status?: ActionItem["status"];
+  },
 ): ActionItem | null {
   const store = getStore();
   const meeting = store.meetings.get(meetingId);
   if (!meeting) return null;
   const item = meeting.actionItems.find((a) => a.id === actionItemId);
   if (!item) return null;
-  item.status = status;
+  if (patch.description !== undefined) item.description = patch.description;
+  if (patch.assigneeName !== undefined) item.assigneeName = patch.assigneeName;
+  if (patch.dueDate !== undefined) item.dueDate = patch.dueDate;
+  if (patch.status !== undefined) item.status = patch.status;
   return item;
 }

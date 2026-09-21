@@ -1,4 +1,4 @@
-import type { ActionItemStatus, Meeting, MeetingSummaryView } from "@/lib/types";
+import type { ActionItem, ActionItemStatus, Meeting, MeetingSummaryView } from "@/lib/types";
 
 // Every call goes through this base URL. It defaults to "" (same-origin),
 // which hits the mock Next.js Route Handlers under app/api/**. Once the
@@ -54,9 +54,33 @@ export const api = {
 
   getMeeting: (id: string) => request<{ meeting: Meeting }>(`/api/meetings/${id}`),
 
-  setActionItemStatus: (meetingId: string, actionItemId: string, status: ActionItemStatus) =>
-    request<{ actionItem: unknown }>(`/api/action-items/${actionItemId}`, {
+  renameMeeting: (id: string, title: string) =>
+    request<{ meeting: Meeting }>(`/api/meetings/${id}`, {
       method: "PATCH",
-      body: JSON.stringify({ meetingId, status }),
+      body: JSON.stringify({ title }),
+    }),
+
+  createActionItem: (
+    meetingId: string,
+    input: { description: string; assigneeName?: string | null; dueDate?: string | null },
+  ) =>
+    request<{ actionItem: ActionItem }>(`/api/meetings/${meetingId}/action-items`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
+  updateActionItem: (
+    meetingId: string,
+    actionItemId: string,
+    patch: {
+      description?: string;
+      assigneeName?: string | null;
+      dueDate?: string | null;
+      status?: ActionItemStatus;
+    },
+  ) =>
+    request<{ actionItem: ActionItem }>(`/api/action-items/${actionItemId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ meetingId, ...patch }),
     }),
 };
