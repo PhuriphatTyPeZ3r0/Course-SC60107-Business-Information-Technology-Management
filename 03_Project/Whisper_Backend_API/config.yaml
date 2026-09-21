@@ -23,6 +23,12 @@ device: cuda
 compute_type: int8
 batch_size: 16
 
+# Longest audio slice (seconds) Whisper decodes at once. With the default 30,
+# a continuous ~26 s call with no long pause became one chunk and the decode
+# stopped mid-word around 21 s, silently dropping the tail. Shorter chunks
+# keep each decode well inside what large-v3 (int8) handles reliably.
+chunk_size_sec: 10
+
 # Alignment (wav2vec2) and Ollama summarization run on CPU on purpose: the
 # whole card only has a few GB free after OS/desktop overhead, and whisper
 # itself is the only model worth spending that on.
