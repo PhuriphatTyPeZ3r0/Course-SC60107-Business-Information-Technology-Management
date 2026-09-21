@@ -43,6 +43,11 @@ export interface Transcript {
   languageCode: string;
   wordCount: number | null;
   segments: SpeakerSegment[];
+  // "stereo-split" when the upload was a 2-channel WAV split into A/B;
+  // "single-speaker-fallback" when it wasn't (any non-WAV format, or a WAV
+  // header src/wav.ts couldn't parse) and everything got labeled "A".
+  // null for transcripts saved before this field existed.
+  diarizationMethod: "stereo-split" | "single-speaker-fallback" | null;
 }
 
 export interface Summary {

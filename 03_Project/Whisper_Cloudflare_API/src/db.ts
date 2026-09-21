@@ -184,13 +184,15 @@ export async function saveTranscript(
   fullText: string,
   languageCode: string,
   segments: Array<{ speaker: string; start: number; end: number; text: string }>,
+  diarizationMethod: "stereo-split" | "single-speaker-fallback",
 ): Promise<string> {
   const wordCount = fullText.trim() ? fullText.trim().split(/\s+/).length : 0;
   const result = await db
     .prepare(
-      "INSERT INTO transcript (job_id, full_text, language_code, word_count, created_at) VALUES (?, ?, ?, ?, ?)",
+      "INSERT INTO transcript (job_id, full_text, language_code, word_count, diarization_method, created_at) " +
+        "VALUES (?, ?, ?, ?, ?, ?)",
     )
-    .bind(jobId, fullText, languageCode, wordCount, now())
+    .bind(jobId, fullText, languageCode, wordCount, diarizationMethod, now())
     .run();
   const transcriptId = result.meta.last_row_id;
 
@@ -286,9 +288,18 @@ async function fetchMeetingFullFromRow(db: D1Database, meeting: MeetingRow): Pro
   let transcript: Transcript | null = null;
   if (transcribeJob?.status === "completed") {
     const tRow = await db
-      .prepare("SELECT transcript_id, full_text, language_code, word_count FROM transcript WHERE job_id = ?")
+      .prepare(
+        "SELECT transcript_id, full_text, language_code, word_count, diarization_method FROM transcript " +
+          "WHERE job_id = ?",
+      )
       .bind(transcribeJob.job_id)
-      .first<{ transcript_id: number; full_text: string; language_code: string; word_count: number | null }>();
+      .first<{
+        transcript_id: number;
+        full_text: string;
+        language_code: string;
+        word_count: number | null;
+        diarization_method: "stereo-split" | "single-speaker-fallback" | null;
+      }>();
     if (tRow) {
       const { results: segRows } = await db
         .prepare(
@@ -308,6 +319,7 @@ async function fetchMeetingFullFromRow(db: D1Database, meeting: MeetingRow): Pro
         fullText: tRow.full_text,
         languageCode: tRow.language_code,
         wordCount: tRow.word_count,
+        diarizationMethod: tRow.diarization_method,
         segments: segRows.map((s) => ({
           id: String(s.speaker_segment_id),
           speakerLabel: s.speaker_label,

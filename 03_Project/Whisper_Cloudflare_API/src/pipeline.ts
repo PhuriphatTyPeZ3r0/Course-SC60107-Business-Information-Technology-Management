@@ -65,18 +65,22 @@ function isStereoWav(buffer: ArrayBuffer): boolean {
 async function runDiarizedTranscription(
   ai: Ai,
   audio: ArrayBuffer,
-): Promise<{ segments: DiarizedSegment[]; language: string }> {
+): Promise<{ segments: DiarizedSegment[]; language: string; diarizationMethod: "stereo-split" | "single-speaker-fallback" }> {
   if (isStereoWav(audio)) {
     const { left, right } = splitStereoWav(audio);
     const [a, b] = await Promise.all([transcribe(ai, left), transcribe(ai, right)]);
     const segments = [...segmentsFromWhisperResult(a, "A"), ...segmentsFromWhisperResult(b, "B")].sort(
       (x, y) => x.start - y.start,
     );
-    return { segments, language: "unknown" };
+    return { segments, language: "unknown", diarizationMethod: "stereo-split" };
   }
 
   const result = await transcribe(ai, audio);
-  return { segments: segmentsFromWhisperResult(result, "A"), language: "unknown" };
+  return {
+    segments: segmentsFromWhisperResult(result, "A"),
+    language: "unknown",
+    diarizationMethod: "single-speaker-fallback",
+  };
 }
 
 export interface PipelineJobIds {
@@ -100,7 +104,7 @@ export async function runMeetingPipeline(
     await db.setJobStatus(env.DB, jobIds.transcribe, "running");
     await db.setJobStatus(env.DB, jobIds.diarize, "running");
 
-    const { segments } = await runDiarizedTranscription(env.AI, audio);
+    const { segments, diarizationMethod } = await runDiarizedTranscription(env.AI, audio);
 
     await db.setJobStatus(env.DB, jobIds.transcribe, "completed");
     await db.setJobStatus(env.DB, jobIds.diarize, "completed");
@@ -109,7 +113,7 @@ export async function runMeetingPipeline(
       .map((s) => s.text)
       .join(" ")
       .trim();
-    await db.saveTranscript(env.DB, jobIds.transcribe, fullText, "th", segments);
+    await db.saveTranscript(env.DB, jobIds.transcribe, fullText, "th", segments, diarizationMethod);
 
     const speakerLabels = [...new Set(segments.map((s) => s.speaker))].sort();
     await db.ensureSpeakerParticipants(env.DB, meetingId, speakerLabels);
