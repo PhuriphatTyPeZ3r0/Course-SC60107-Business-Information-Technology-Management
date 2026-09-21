@@ -1,0 +1,29 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "whisper-cloudflare-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-21",
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "whisper-cloudflare-db",
+      "database_id": "15750933-b5e4-48d0-95be-375d72ff9c43"
+    }
+  ],
+
+  // R2 needs to be enabled via the Cloudflare dashboard first (one-time,
+  // account-level - not an API-automatable step); not yet done, so no
+  // r2_buckets binding here yet. Not a blocker: the current pipeline
+  // processes uploads in-memory within the request and never touches R2 -
+  // it's provisioned for the future Queues-based slice, not used today.
+
+  "ai": {
+    "binding": "AI"
+  },
+
+  "vars": {
+    // Frontend origin allowed to call this API cross-origin.
+    "CORS_ORIGIN": "http://localhost:3000"
+  }
+}

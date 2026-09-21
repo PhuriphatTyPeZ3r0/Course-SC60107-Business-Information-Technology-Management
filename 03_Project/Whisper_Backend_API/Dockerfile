@@ -18,10 +18,13 @@ COPY requirements.txt .
 # not part of the final image, so drop --no-cache-dir to actually use it.
 # Install the CUDA 12.1 torch build first so whisperx's own torch dependency
 # is already satisfied and doesn't pull a CPU-only wheel instead.
+# --retries/--timeout: large CUDA/ML wheels (100s of MB) have been seen
+# stalling mid-download on flaky connections, aborting the whole RUN step;
+# retrying resumes against the warm pip cache instead of failing outright.
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu121
+    pip install --retries 8 --timeout 60 torch torchaudio --index-url https://download.pytorch.org/whl/cu121
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install -r requirements.txt
+    pip install --retries 8 --timeout 60 -r requirements.txt
 
 # Only the files prefetch_models.py actually needs are copied before it runs,
 # so editing application code (Process/, main.py) below never invalidates

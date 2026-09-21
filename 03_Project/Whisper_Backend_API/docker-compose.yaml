@@ -9,9 +9,16 @@ services:
     restart: unless-stopped
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
+      - DATABASE_URL=postgresql://whisper:${POSTGRES_PASSWORD:-whisper}@postgres:5432/whisper_db
+      # Frontend origin allowed to call this API cross-origin (see
+      # Process/Service.py's CORSMiddleware). Override for a deployed frontend.
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3000}
     networks:
       - default
       - summarize-net
+    depends_on:
+      postgres:
+        condition: service_healthy
     deploy:
       resources:
         reservations:
@@ -19,6 +26,38 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
+
+  # Backs the meetings/teams/jobs/action-items persistence layer the
+  # frontend expects (see FRONTEND_HANDOFF.md) - schema.sql/stored_procedures.sql
+  # are the same Postgres design kept as the Cloudflare port's local-dev
+  # parallel path (see CLAUDE.md), applied here for real. On the `default`
+  # network (unlike ollama, which lives in ../Summarize_Model's compose
+  # project and is reached over the external summarize-net network instead).
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=whisper
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-whisper}
+      - POSTGRES_DB=whisper_db
+    ports:
+      # Host port 5433, not 5432: this machine already has a native Postgres
+      # bound to 5432. Only affects host-side access (psql, local scripts);
+      # whisper-api talks to this container over the internal Docker network
+      # at postgres:5432 regardless.
+      - "5433:5432"
+    volumes:
+      - whisper-db-data:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./stored_procedures.sql:/docker-entrypoint-initdb.d/02-stored_procedures.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U whisper -d whisper_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  whisper-db-data:
 
 # Ollama is deployed separately from ../Summarize_Model (start it first); this
 # joins its network so OLLAMA_BASE_URL=http://ollama:11434 still resolves.
