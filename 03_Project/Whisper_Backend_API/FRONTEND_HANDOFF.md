@@ -1,6 +1,6 @@
 # Frontend integration — architecture & status
 
-The `whisper-frontend` app (Next.js, `03_Project/whisper-frontend/`) was
+The `whisper-frontend` app (Next.js, `03_Project/Whisper-Frontend/`) was
 built against a mocked API before this backend integration existed. This
 doc records how the two now fit together for real, what's still
 simplified, and what the Cloudflare Workers port (see `CLAUDE.md`) will
@@ -25,7 +25,7 @@ docker compose up --build      # postgres + whisper-api (joins summarize-net)
 ```
 
 ```bash
-cd 03_Project/whisper-frontend
+cd 03_Project/Whisper-Frontend
 echo "NEXT_PUBLIC_API_BASE_URL=http://localhost:8050" > .env.local
 npm run dev
 ```

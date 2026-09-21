@@ -15,7 +15,7 @@ below) since Cloudflare moves models behind Paid over time.
 - **Verified end-to-end** via `curl`: signup, login, meeting list, and a
   real upload through the full pipeline (Workers AI Whisper transcription
   -> Workers AI Llama summarization -> D1 persistence) - all jobs completed
-  in ~4 seconds for a short test clip. `whisper-frontend/.env.local` is
+  in ~4 seconds for a short test clip. `Whisper-Frontend/.env.local` is
   currently pointed at this URL.
 - **Deployed via the raw Cloudflare API, not `wrangler deploy`** - see
   "Deployment method" below for why and what that changes day-to-day.
@@ -32,7 +32,7 @@ Whisper_Cloudflare_API/
     ├── pipeline.ts           # Workers AI transcribe + summarize orchestration
     ├── wav.ts                # Pure-TS WAV parsing/channel-splitting (see below)
     ├── auth.ts               # PBKDF2 password hashing via Web Crypto API
-    └── types.ts              # Shared types, mirrors whisper-frontend/src/lib/types.ts
+    └── types.ts              # Shared types, mirrors Whisper-Frontend/src/lib/types.ts
 ```
 
 ## Deployment method
