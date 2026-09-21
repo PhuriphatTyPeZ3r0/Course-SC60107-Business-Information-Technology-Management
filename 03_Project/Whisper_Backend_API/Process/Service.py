@@ -109,6 +109,7 @@ async def lifespan(app: FastAPI):
         device=device,
         align_device=align_device,
         batch_size=config.get("batch_size", 16),
+        chunk_size_sec=config.get("chunk_size_sec", 30),
     )
     # Aligners for other languages load on first use; these are just ready up front.
     for language in config.get("warm_align_languages", []):

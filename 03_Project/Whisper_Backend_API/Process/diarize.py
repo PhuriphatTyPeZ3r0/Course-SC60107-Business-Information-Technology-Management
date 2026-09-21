@@ -1,3 +1,6 @@
+import unicodedata
+
+
 def _diarized_segment(seg: dict, speaker: str) -> dict:
     """One output row: time range, speaker, then text (this key order is the API's output format)."""
     return {"start": seg["start"], "end": seg["end"], "speaker": speaker, "text": seg["text"]}
@@ -52,6 +55,41 @@ def _timed_chars(seg: dict) -> list[tuple[str, float, float]]:
     return out
 
 
+def _word_lengths(text: str) -> list[int]:
+    """Character length of each word in `text` (Thai has no spaces, so a dictionary tokenizer finds them)."""
+    try:
+        from pythainlp.tokenize import word_tokenize
+
+        lengths = [len(w) for w in word_tokenize(text, engine="newmm", keep_whitespace=True)]
+        if sum(lengths) == len(text):
+            return lengths
+    except Exception:
+        pass
+    # No tokenizer (or it dropped characters): treat each character as a word,
+    # except combining marks, which can never start a word of their own.
+    return [0 if unicodedata.category(c) == "Mn" else 1 for c in text]
+
+
+def _snap_to_word_boundaries(text: str, speakers: list[str]) -> list[str]:
+    """Give every character of a word the speaker who owns most of it, so a speaker change never cuts a word."""
+    out = list(speakers)
+    pos = 0
+    for length in _word_lengths(text):
+        if length == 0:
+            # Combining mark: follows the character before it.
+            if pos > 0:
+                out[pos] = out[pos - 1]
+            pos += 1
+            continue
+        end = min(pos + length, len(out))
+        chunk = out[pos:end]
+        if chunk:
+            winner = max(set(chunk), key=chunk.count)
+            out[pos:end] = [winner] * len(chunk)
+        pos = end
+    return out
+
+
 def build_mono_diarized_transcript(transcript: dict, turns: list[dict]) -> dict:
     """Split a mono char-aligned transcript (transcribe_with_chars()) by speaker turns.
 
@@ -85,9 +123,13 @@ def build_mono_diarized_transcript(transcript: dict, turns: list[dict]) -> dict:
             group_speaker = None
             group_text = ""
             group_start = group_end = 0.0
-            for char, start, end in _timed_chars(seg):
+            timed = _timed_chars(seg)
+            speakers = []
+            for _char, start, end in timed:
                 turn = _turn_for_time((start + end) / 2, turns)
-                speaker = relabel(turn["speaker"]) if turn else "UNKNOWN"
+                speakers.append(relabel(turn["speaker"]) if turn else "UNKNOWN")
+            speakers = _snap_to_word_boundaries("".join(c for c, _, _ in timed), speakers)
+            for (char, start, end), speaker in zip(timed, speakers):
                 if speaker != group_speaker:
                     if group_speaker is not None:
                         add_row(group_speaker, group_start, group_end, group_text)

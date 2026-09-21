@@ -24,6 +24,7 @@ class WhisperPipeline:
         device: str,
         align_device: str,
         batch_size: int = 16,
+        chunk_size_sec: int = 30,
     ):
         self.model = model
         # Language code -> wav2vec2 model name, for languages whisperx has no
@@ -37,6 +38,8 @@ class WhisperPipeline:
         # (GPU) on purpose — see config.yaml's align_device comment for why.
         self.align_device = align_device
         self.batch_size = batch_size
+        # Longest audio slice Whisper decodes in one go; see config.yaml's chunk_size_sec.
+        self.chunk_size_sec = chunk_size_sec
 
     def _transcribe_raw(self, audio_path: str, max_duration_sec: float | None):
         audio = whisperx.load_audio(audio_path)
@@ -46,7 +49,7 @@ class WhisperPipeline:
 
         # No `language=` kwarg on purpose: the language is detected per
         # request, so any language Whisper knows can be sent in.
-        result = self.model.transcribe(audio, batch_size=self.batch_size)
+        result = self.model.transcribe(audio, batch_size=self.batch_size, chunk_size=self.chunk_size_sec)
         return result, audio, duration_sec, result.get("language")
 
     def load_aligner(self, language: str):
