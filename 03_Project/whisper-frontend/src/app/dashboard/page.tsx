@@ -77,7 +77,7 @@ export default function DashboardPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: i * 0.05 }}
             >
-              <Link href={`/dashboard/meetings/${meeting.id}`}>
+              <Link href={`/dashboard/meeting?id=${meeting.id}`}>
                 <Card className="glass-panel h-full transition-colors hover:border-primary/40">
                   <CardHeader>
                     <div className="flex items-start justify-between gap-2">

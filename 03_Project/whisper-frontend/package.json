@@ -10,8 +10,6 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
-    "@splinetool/react-spline": "^4.1.0",
-    "@splinetool/runtime": "^2.0.55",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cn": "^0.3.0",

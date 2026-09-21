@@ -1,35 +1,18 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import { Suspense } from "react";
 import { motion } from "framer-motion";
 import { useMounted } from "@/lib/hooks/use-mounted";
 
-const Spline = dynamic(() => import("@splinetool/react-spline"), { ssr: false });
-
-const SPLINE_SCENE_URL = process.env.NEXT_PUBLIC_SPLINE_SCENE_URL;
-
 /**
- * Landing hero visual. Renders a real Spline scene when
- * NEXT_PUBLIC_SPLINE_SCENE_URL is set (design that scene visually at
- * https://spline.design — it's a GUI tool, not something scriptable here).
- * Until then, falls back to a coded animated glass/gradient scene so the
- * landing still looks intentional out of the box, and on mobile/reduced-
- * motion where the live WebGL scene is skipped for performance.
+ * Landing hero visual: a coded animated glass/gradient scene. A real Spline
+ * scene (@splinetool/react-spline) was the original plan (see grilling
+ * session notes), but designing one requires Spline's own GUI editor, and
+ * the library pulls in ~5MB of WASM (physics/geometry engines) that goes
+ * entirely unused without an actual scene configured — not worth bundling
+ * on every deploy for a dependency nothing renders yet. Re-add it once a
+ * real scene exists.
  */
-export function HeroScene({ forceFallback = false }: { forceFallback?: boolean }) {
-  if (SPLINE_SCENE_URL && !forceFallback) {
-    return (
-      <Suspense fallback={<FallbackScene />}>
-        <Spline scene={SPLINE_SCENE_URL} className="h-full w-full" />
-      </Suspense>
-    );
-  }
-
-  return <FallbackScene />;
-}
-
-function FallbackScene() {
+export function HeroScene() {
   const mounted = useMounted();
 
   return (

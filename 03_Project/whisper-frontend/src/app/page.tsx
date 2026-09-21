@@ -7,12 +7,10 @@ import { buttonVariants } from "@/components/ui/button";
 import { SiteHeader } from "@/components/site-header";
 import { HeroScene } from "@/components/hero-scene";
 import { useLanguage } from "@/lib/i18n/context";
-import { useLiteMode } from "@/lib/hooks/use-lite-mode";
 import { useMounted } from "@/lib/hooks/use-mounted";
 
 export default function Home() {
   const { t } = useLanguage();
-  const liteMode = useLiteMode();
   const mounted = useMounted();
 
   const features = [
@@ -27,7 +25,7 @@ export default function Home() {
 
       <section className="relative flex flex-1 items-center overflow-hidden">
         <div className="absolute inset-0">
-          <HeroScene forceFallback={liteMode} />
+          <HeroScene />
         </div>
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
 

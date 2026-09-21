@@ -26,7 +26,7 @@ export default function NewMeetingPage() {
     setIsSubmitting(true);
     try {
       const { meeting } = await api.createMeeting(title.trim(), file);
-      router.push(`/dashboard/meetings/${meeting.id}`);
+      router.push(`/dashboard/meeting?id=${meeting.id}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Something went wrong");
       setIsSubmitting(false);

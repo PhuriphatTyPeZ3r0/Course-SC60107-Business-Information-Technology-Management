@@ -1,7 +1,8 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { ChevronLeft, TriangleAlert } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,13 +17,19 @@ import { useMounted } from "@/lib/hooks/use-mounted";
 import { api } from "@/lib/api/client";
 import type { Meeting } from "@/lib/types";
 
-export default function MeetingDetailPage(props: PageProps<"/dashboard/meetings/[id]">) {
-  const { id } = use(props.params);
+// A query-param route (?id=...), not a dynamic segment ([id]/page.tsx): this
+// app is deployed as a static export (Cloudflare Pages has no Next.js SSR
+// runtime here), and static hosting can't serve arbitrary unknown dynamic
+// paths - there's only ever one physical /dashboard/meeting page, and the id
+// is pure client-side state via useSearchParams().
+function MeetingDetailContent() {
+  const id = useSearchParams().get("id") ?? "";
   const { t } = useLanguage();
   const mounted = useMounted();
   const [meeting, setMeeting] = useState<Meeting | null>(null);
 
   useEffect(() => {
+    if (!id) return;
     let cancelled = false;
     let interval: ReturnType<typeof setInterval> | null = null;
 
@@ -138,5 +145,13 @@ export default function MeetingDetailPage(props: PageProps<"/dashboard/meetings/
         </>
       )}
     </div>
+  );
+}
+
+export default function MeetingDetailPage() {
+  return (
+    <Suspense fallback={<Skeleton className="h-48 rounded-2xl" />}>
+      <MeetingDetailContent />
+    </Suspense>
   );
 }
