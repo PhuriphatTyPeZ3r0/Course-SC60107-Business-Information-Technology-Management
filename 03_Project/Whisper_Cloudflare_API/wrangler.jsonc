@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "whisper-cloudflare-api",
+  "name": "whisper-api",
   "main": "src/index.ts",
   "compatibility_date": "2026-09-21",
 
@@ -24,6 +24,6 @@
 
   "vars": {
     // Frontend origin allowed to call this API cross-origin.
-    "CORS_ORIGIN": "http://localhost:3000"
+    "CORS_ORIGIN": "https://whisper-web.phuriphathem.workers.dev"
   }
 }

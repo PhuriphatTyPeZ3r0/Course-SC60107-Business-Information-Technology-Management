@@ -1,0 +1,14 @@
+{
+  "name": "whisper-web",
+  "compatibility_date": "2026-09-21",
+
+  // Static export output (see scripts/build-static.sh). Deployed today via
+  // the Cloudflare API's assets-upload-session flow, not `wrangler deploy`
+  // (wrangler has never been authenticated in this project) - this file is
+  // the source-of-truth config to keep in sync with what's actually live,
+  // and becomes usable with `wrangler deploy` directly once that changes.
+  "assets": {
+    "directory": "./out",
+    "not_found_handling": "404-page"
+  }
+}
