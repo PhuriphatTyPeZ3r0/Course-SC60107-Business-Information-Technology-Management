@@ -13,7 +13,7 @@ import type {
   User,
 } from "./types";
 
-export const DEMO_USER_EMAIL = "demo@sarup.app";
+export const DEMO_USER_EMAIL = "demo@whisper.app";
 const DEMO_USER_DISPLAY_NAME = "Demo User";
 const DEMO_TEAM_NAME = "Demo Team";
 

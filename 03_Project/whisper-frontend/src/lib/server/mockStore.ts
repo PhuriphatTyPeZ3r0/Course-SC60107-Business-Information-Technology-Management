@@ -22,7 +22,7 @@ function makeId(prefix: string) {
 
 export const DEMO_USER: User = {
   id: "user_demo",
-  email: "demo@sarup.app",
+  email: "demo@whisper.app",
   displayName: "Demo User",
 };
 
@@ -164,7 +164,7 @@ interface Store {
   meetings: Map<string, Meeting>;
 }
 
-const globalForStore = globalThis as unknown as { __sarupStore?: Store };
+const globalForStore = globalThis as unknown as { __whisperStore?: Store };
 
 function seedStore(): Store {
   const store: Store = { meetings: new Map() };
@@ -213,10 +213,10 @@ function createMeetingInternal(
 }
 
 function getStore(): Store {
-  if (!globalForStore.__sarupStore) {
-    globalForStore.__sarupStore = seedStore();
+  if (!globalForStore.__whisperStore) {
+    globalForStore.__whisperStore = seedStore();
   }
-  return globalForStore.__sarupStore;
+  return globalForStore.__whisperStore;
 }
 
 export function listMeetings(): Meeting[] {

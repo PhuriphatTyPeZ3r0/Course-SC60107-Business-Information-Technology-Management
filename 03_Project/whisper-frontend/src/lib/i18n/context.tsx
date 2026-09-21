@@ -4,7 +4,7 @@ import { createContext, useContext, useMemo } from "react";
 import { type Dictionary, type Locale, dictionary } from "./dictionaries";
 import { useLocalStorageRaw, writeLocalStorage } from "@/lib/hooks/use-local-storage";
 
-const STORAGE_KEY = "sarup.locale";
+const STORAGE_KEY = "whisper.locale";
 
 interface LanguageContextValue {
   locale: Locale;

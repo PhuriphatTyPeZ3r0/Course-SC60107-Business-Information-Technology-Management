@@ -14,9 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Sarup — AI Meeting Intelligence",
+  title: "Whisper — AI Meeting Intelligence",
   description:
-    "Sarup transcribes, diarizes, and summarizes Thai meetings, and turns them into action items automatically.",
+    "Whisper transcribes, diarizes, and summarizes Thai meetings, and turns them into action items automatically.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

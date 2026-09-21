@@ -5,7 +5,7 @@ import { api, type AuthedUser } from "@/lib/api/client";
 import { useLocalStorageRaw, writeLocalStorage } from "@/lib/hooks/use-local-storage";
 import { useMounted } from "@/lib/hooks/use-mounted";
 
-const STORAGE_KEY = "sarup.session";
+const STORAGE_KEY = "whisper.session";
 
 interface Session {
   token: string;

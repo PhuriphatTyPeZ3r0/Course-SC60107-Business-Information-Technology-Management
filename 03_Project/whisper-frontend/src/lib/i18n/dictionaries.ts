@@ -2,13 +2,13 @@ export type Locale = "th" | "en";
 
 export const dictionaries = {
   th: {
-    brand: "Sarup",
+    brand: "Whisper",
     nav: { login: "เข้าสู่ระบบ", dashboard: "แดชบอร์ด", logout: "ออกจากระบบ" },
     landing: {
       eyebrow: "AI สรุปการประชุมภาษาไทย",
       title: "ฟังประชุม สรุปงาน จบในที่เดียว",
       subtitle:
-        "อัปโหลดไฟล์เสียงประชุม แล้วให้ Sarup ถอดเสียง แยกผู้พูด สรุปเนื้อหา และไล่รายการงานที่ต้องทำให้อัตโนมัติ",
+        "อัปโหลดไฟล์เสียงประชุม แล้วให้ Whisper ถอดเสียง แยกผู้พูด สรุปเนื้อหา และไล่รายการงานที่ต้องทำให้อัตโนมัติ",
       cta: "เริ่มใช้งานฟรี",
       ctaSecondary: "เข้าสู่ระบบ",
       featuresTitle: "ครบทุกขั้นตอนหลังประชุมจบ",
@@ -58,7 +58,7 @@ export const dictionaries = {
     },
     newMeeting: {
       title: "สร้างการประชุมใหม่",
-      subtitle: "อัปโหลดไฟล์เสียง แล้วปล่อยให้ Sarup จัดการที่เหลือ",
+      subtitle: "อัปโหลดไฟล์เสียง แล้วปล่อยให้ Whisper จัดการที่เหลือ",
       titleLabel: "ชื่อการประชุม",
       titlePlaceholder: "เช่น ประชุมทีมประจำสัปดาห์",
       fileLabel: "ไฟล์เสียง (mp3, wav, flac)",
@@ -80,13 +80,13 @@ export const dictionaries = {
     common: { back: "ย้อนกลับ" },
   },
   en: {
-    brand: "Sarup",
+    brand: "Whisper",
     nav: { login: "Log in", dashboard: "Dashboard", logout: "Log out" },
     landing: {
       eyebrow: "AI meeting intelligence for Thai teams",
       title: "Hear the meeting. Ship the follow-up.",
       subtitle:
-        "Upload the recording and let Sarup transcribe, identify speakers, summarize, and pull out action items automatically.",
+        "Upload the recording and let Whisper transcribe, identify speakers, summarize, and pull out action items automatically.",
       cta: "Get started free",
       ctaSecondary: "Log in",
       featuresTitle: "Everything that happens after the meeting ends",
@@ -136,7 +136,7 @@ export const dictionaries = {
     },
     newMeeting: {
       title: "New meeting",
-      subtitle: "Upload the recording and let Sarup handle the rest",
+      subtitle: "Upload the recording and let Whisper handle the rest",
       titleLabel: "Meeting title",
       titlePlaceholder: "e.g. Weekly team sync",
       fileLabel: "Audio file (mp3, wav, flac)",

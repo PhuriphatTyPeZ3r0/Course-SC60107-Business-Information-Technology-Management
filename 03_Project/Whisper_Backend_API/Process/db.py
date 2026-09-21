@@ -21,7 +21,7 @@ logger = logging.getLogger("whisper_api.db")
 
 _pool: asyncpg.Pool | None = None
 
-DEMO_USER_EMAIL = "demo@sarup.app"
+DEMO_USER_EMAIL = "demo@whisper.app"
 DEMO_USER_DISPLAY_NAME = "Demo User"
 DEMO_TEAM_NAME = "Demo Team"
 
