@@ -223,19 +223,43 @@ async def ensure_speaker_participants(meeting_id: str, speaker_labels: list[str]
 # ---------------------------------------------------------------------------
 
 
-async def _fetch_meeting_ids_for_team(team_id: str) -> list[str]:
+async def list_team_meetings() -> list[dict]:
+    """Lean listing for the dashboard (MeetingSummaryView on the frontend) —
+    one query, not one round trip per meeting. Deliberately doesn't touch
+    transcript/segments: the list view never renders them, only
+    get_meeting_full() (single-meeting detail) needs the full shape."""
     assert _pool is not None
     rows = await _pool.fetch(
-        "SELECT meeting_id FROM tbl_meeting WHERE team_id = $1 AND deleted_at IS NULL "
-        "ORDER BY created_at DESC",
-        team_id,
+        """
+        SELECT
+            m.meeting_id,
+            m.title,
+            m.meeting_date,
+            m.status,
+            m.created_at,
+            (SELECT count(*) FROM tbl_meeting_participant mp WHERE mp.meeting_id = m.meeting_id)
+                AS participant_count,
+            (SELECT count(*) FROM tbl_action_item a
+                WHERE a.meeting_id = m.meeting_id AND a.deleted_at IS NULL AND a.status != 'done')
+                AS action_item_open_count
+        FROM tbl_meeting m
+        WHERE m.team_id = $1 AND m.deleted_at IS NULL
+        ORDER BY m.created_at DESC
+        """,
+        get_demo_team_id(),
     )
-    return [str(r["meeting_id"]) for r in rows]
-
-
-async def list_team_meetings() -> list[dict]:
-    ids = await _fetch_meeting_ids_for_team(get_demo_team_id())
-    return [m for m in [await get_meeting_full(mid) for mid in ids] if m is not None]
+    return [
+        {
+            "id": str(r["meeting_id"]),
+            "title": r["title"],
+            "meetingDate": _iso(r["meeting_date"]),
+            "status": r["status"],
+            "createdAt": _iso(r["created_at"]),
+            "participantCount": r["participant_count"],
+            "actionItemOpenCount": r["action_item_open_count"],
+        }
+        for r in rows
+    ]
 
 
 async def get_meeting_full(meeting_id: str) -> dict | None:
