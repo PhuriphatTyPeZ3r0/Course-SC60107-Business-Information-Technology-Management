@@ -4,6 +4,7 @@ import type {
   Job,
   JobType,
   Meeting,
+  MeetingSummaryView,
   Participant,
   SpeakerSegment,
   Team,
@@ -219,11 +220,20 @@ function getStore(): Store {
   return globalForStore.__whisperStore;
 }
 
-export function listMeetings(): Meeting[] {
+export function listMeetings(): MeetingSummaryView[] {
   const store = getStore();
   return [...store.meetings.values()]
     .map(materialize)
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .map((m) => ({
+      id: m.id,
+      title: m.title,
+      meetingDate: m.meetingDate,
+      status: m.status,
+      createdAt: m.createdAt,
+      participantCount: m.participants.length,
+      actionItemOpenCount: m.actionItems.filter((a) => a.status !== "done").length,
+    }));
 }
 
 export function getMeeting(id: string): Meeting | null {

@@ -10,28 +10,34 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { MeetingStatusBadge } from "@/components/status-badge";
 import { useLanguage } from "@/lib/i18n/context";
 import { api } from "@/lib/api/client";
-import type { Meeting } from "@/lib/types";
+import type { MeetingSummaryView } from "@/lib/types";
 
 export default function DashboardPage() {
   const { t, locale } = useLanguage();
-  const [meetings, setMeetings] = useState<Meeting[] | null>(null);
+  const [meetings, setMeetings] = useState<MeetingSummaryView[] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    let interval: ReturnType<typeof setInterval> | null = null;
 
     async function load() {
       const { meetings } = await api.listMeetings();
-      if (!cancelled) setMeetings(meetings);
+      if (cancelled) return;
+      setMeetings(meetings);
+      // Stop polling once nothing is still processing — mirrors the same
+      // pattern on the meeting detail page. Restarts on next mount/focus.
+      if (!meetings.some((m) => m.status === "processing") && interval) {
+        clearInterval(interval);
+        interval = null;
+      }
     }
 
     load();
-    // Cheap enough to always poll at this interval; keeps any
-    // still-processing meeting's status/badge fresh without extra state.
-    const interval = setInterval(load, 2500);
+    interval = setInterval(load, 2500);
 
     return () => {
       cancelled = true;
-      clearInterval(interval);
+      if (interval) clearInterval(interval);
     };
   }, []);
 
@@ -89,12 +95,11 @@ export default function DashboardPage() {
                     <p>{dateFormatter.format(new Date(meeting.createdAt))}</p>
                     <div className="flex items-center gap-1.5">
                       <Users className="size-3.5" />
-                      {meeting.participants.length} {t.dashboard.participants}
+                      {meeting.participantCount} {t.dashboard.participants}
                     </div>
-                    {meeting.actionItems.length > 0 && (
+                    {meeting.actionItemOpenCount > 0 && (
                       <p>
-                        {meeting.actionItems.filter((a) => a.status !== "done").length}{" "}
-                        {t.dashboard.openActionItems}
+                        {meeting.actionItemOpenCount} {t.dashboard.openActionItems}
                       </p>
                     )}
                   </CardContent>

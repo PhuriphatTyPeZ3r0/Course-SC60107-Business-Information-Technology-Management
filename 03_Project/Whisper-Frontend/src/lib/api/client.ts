@@ -1,4 +1,4 @@
-import type { ActionItemStatus, Meeting } from "@/lib/types";
+import type { ActionItemStatus, Meeting, MeetingSummaryView } from "@/lib/types";
 
 // Every call goes through this base URL. It defaults to "" (same-origin),
 // which hits the mock Next.js Route Handlers under app/api/**. Once the
@@ -43,7 +43,7 @@ export const api = {
       body: JSON.stringify({ email, password, displayName }),
     }),
 
-  listMeetings: () => request<{ meetings: Meeting[] }>("/api/meetings"),
+  listMeetings: () => request<{ meetings: MeetingSummaryView[] }>("/api/meetings"),
 
   createMeeting: (title: string, file: File) => {
     const formData = new FormData();
