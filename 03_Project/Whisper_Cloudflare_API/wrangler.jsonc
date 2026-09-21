@@ -24,6 +24,6 @@
 
   "vars": {
     // Frontend origin allowed to call this API cross-origin.
-    "CORS_ORIGIN": "https://whisper-web.phuriphathem.workers.dev"
+    "CORS_ORIGIN": "https://whisper-web.whisper-ai.workers.dev"
   }
 }

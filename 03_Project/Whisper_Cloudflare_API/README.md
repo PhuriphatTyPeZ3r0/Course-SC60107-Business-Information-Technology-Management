@@ -11,7 +11,7 @@ free Workers plan by design (see `CLAUDE.md`'s hard constraint); model
 free-tier eligibility was re-verified the same day (see "Model status"
 below) since Cloudflare moves models behind Paid over time.
 
-- **Live URL**: `https://whisper-api.phuriphathem.workers.dev`
+- **Live URL**: `https://whisper-api.whisper-ai.workers.dev`
 - **Verified end-to-end** via `curl`: signup, login, meeting list, and a
   real upload through the full pipeline (Workers AI Whisper transcription
   -> Workers AI Llama summarization -> D1 persistence) - all jobs completed
