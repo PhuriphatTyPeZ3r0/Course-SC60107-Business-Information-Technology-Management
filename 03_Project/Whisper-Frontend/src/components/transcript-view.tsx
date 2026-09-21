@@ -1,4 +1,6 @@
+import { Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useLanguage } from "@/lib/i18n/context";
 import type { Transcript } from "@/lib/types";
 
 const SPEAKER_COLORS = [
@@ -16,10 +18,17 @@ function formatTimestamp(ms: number) {
 }
 
 export function TranscriptView({ transcript }: { transcript: Transcript }) {
+  const { t } = useLanguage();
   const speakerOrder = [...new Set(transcript.segments.map((s) => s.speakerLabel))];
 
   return (
     <div className="space-y-5">
+      {transcript.diarizationMethod === "single-speaker-fallback" && (
+        <div className="flex items-start gap-2 rounded-lg border border-muted-foreground/20 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+          <Info className="mt-0.5 size-3.5 shrink-0" />
+          <span>{t.meetingDetail.singleSpeakerFallback}</span>
+        </div>
+      )}
       {transcript.segments.map((segment) => {
         const colorIndex = speakerOrder.indexOf(segment.speakerLabel) % SPEAKER_COLORS.length;
         return (

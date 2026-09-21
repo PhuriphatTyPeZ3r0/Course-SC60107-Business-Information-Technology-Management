@@ -76,6 +76,8 @@ export const dictionaries = {
       noActionItems: "ยังไม่มีรายการงาน",
       due: "กำหนดส่ง",
       assignee: "ผู้รับผิดชอบ",
+      singleSpeakerFallback:
+        "ตรวจพบผู้พูดเพียงคนเดียว — ระบบแยกเสียงอาจไม่รองรับไฟล์นี้ (รองรับเฉพาะ WAV แบบสเตอริโอ) ลองอัปโหลดไฟล์ WAV 2 แชนแนลหากต้องการแยกผู้พูด",
     },
     common: { back: "ย้อนกลับ" },
   },
@@ -154,6 +156,8 @@ export const dictionaries = {
       noActionItems: "No action items yet",
       due: "Due",
       assignee: "Assignee",
+      singleSpeakerFallback:
+        "Only one speaker was detected — this file format may not support speaker separation (stereo WAV only). Try uploading a 2-channel WAV to split speakers.",
     },
     common: { back: "Back" },
   },

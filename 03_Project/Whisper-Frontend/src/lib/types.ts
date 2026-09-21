@@ -50,6 +50,11 @@ export interface Transcript {
   fullText: string;
   languageCode: string;
   wordCount: number;
+  // "stereo-split" when the upload was a 2-channel file with real speaker
+  // separation; "single-speaker-fallback" when the backend couldn't split
+  // channels (unsupported/unparseable file) and everything is one speaker.
+  // Only ever set by the Cloudflare-backed deployment; absent/null elsewhere.
+  diarizationMethod?: "stereo-split" | "single-speaker-fallback" | null;
   segments: SpeakerSegment[];
 }
 
