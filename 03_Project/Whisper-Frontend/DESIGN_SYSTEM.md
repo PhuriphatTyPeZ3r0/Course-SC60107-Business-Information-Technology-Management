@@ -1,6 +1,6 @@
 # Whisper-Frontend — Design system & completeness plan
 
-Produced from a grilling session on 2026-09-21. Covers two things:
+Produced from a grilling session on 2026-09-21; §5b updated by a second session on 2026-09-22 (Google OAuth2 SSO, per-user data isolation, PII encryption — supersedes that section's original password-auth design). Covers two things:
 
 1. A visual design-system refresh (typography, icons, a "Liquid Glass" evolution of the existing glass surfaces).
 2. Closing real frontend↔backend gaps found during the audit — some built now, some designed here and deferred past the 2026-09-23 deadline.
@@ -104,24 +104,61 @@ Today: `Whisper_Cloudflare_API/src/db.ts` only has `setMeetingStatus` (status-on
 - **Frontend**: delete action (icon button, Material Symbols `delete`) on each dashboard card and on the meeting detail page, with a confirm step (destructive action — needs explicit confirmation per this project's own UX conventions, e.g. an `AlertDialog` from the existing `ui/dialog.tsx` primitives). A "Trash" entry in `dashboard-nav.tsx` linking to a view reusing the existing dashboard card grid, sourced from the trash-filtered list, with a "Restore" button instead of a link-through.
 - Out of scope even in this deferred design: auto-purge after N days, and extending soft-delete to action items/participants — no real user need surfaced for either.
 
-### 5b. Real authentication
+### 5b. Real authentication — Google OAuth2 SSO, per-user data isolation, encrypted PII
 
-Today: `POST /api/auth/login` only checks the email exists and **ignores the password entirely** (`index.ts:56-63`, same on the Python backend); the issued `token` is `crypto.randomUUID()`, never persisted, and the frontend never sends it back on any later request (`client.ts`'s `request()` attaches no `Authorization` header at all). Every signed-up user is added to the same single seeded "Demo Team" and every list/read query pulls from that one team regardless of who's "logged in" — so today there is zero real per-request authorization, not just a weak password check.
+**Supersedes the plain-password design from the previous revision of this doc.** Produced from a second grilling session on 2026-09-22. Scope, settled in that interview:
 
-Chosen shape: **stateless signed bearer token**, no new DB table, single shared team stays exactly as-is (this only makes login/session real, it doesn't add multi-tenancy).
+- Google OAuth2 (Authorization Code flow) **replaces password login entirely** — the signup/login forms and `verifyPassword()` path go away, "Sign in with Google" is the only door in.
+- **Per-user data isolation** via an auto-created personal team per user, reusing the existing team schema as-is — not a schema redesign.
+- **Encryption scope is account/PII fields only** (`email`, `display_name`) — meeting content (title, transcript, summary, action items) stays as plain text so search/sort/filter keep working. AES-256-GCM via Web Crypto (`crypto.subtle`, already used in `auth.ts` for PBKDF2 — no new dependency).
+- Session/token mechanism is **unchanged** from the previous design: a stateless signed bearer token (HMAC via Web Crypto, no session table), `Authorization: Bearer <token>` on every request, 401 → client clears session and redirects to `/login`. OAuth2 only changes *how* the user's identity is established before that token is issued.
+- Google Cloud OAuth client **does not exist yet** — §5b-iv below is the exact manual checklist to create one; nothing here can go live before that's done.
 
-**Backend:**
-- Add `src/auth.ts` helpers (a real hash-verify function already exists per the file's own comment — "real PBKDF2 hash... but /api/auth/login only looks the account up by email" — so the hash-compare half is mostly wiring, not new crypto).
-- `POST /api/auth/login`: verify `password` against the stored PBKDF2 hash with `crypto.subtle`; on mismatch return `401 INVALID_CREDENTIALS` (today it never can).
-- Token = a compact signed payload: `base64url(JSON{userId, exp}) + "." + base64url(HMAC-SHA256(that JSON, a secret))`, secret stored as a Worker secret (`wrangler secret put AUTH_SECRET`), verified with `crypto.subtle.verify`. No session table, no DB round trip to validate — matches this project's existing "no framework, minimal surface" pattern (see `index.ts`'s own comment on why there's no Hono).
-- Every route except `/health`, `/api/auth/login`, `/api/auth/signup` requires a valid `Authorization: Bearer <token>`; missing/invalid/expired → `401`. Extract `userId` from the verified token instead of always resolving the single demo user.
-- Reasonable expiry: 7 days (long enough not to be annoying for a demo app, short enough that a leaked token isn't forever).
+Today's state this replaces: `POST /api/auth/login` only checks the email exists and ignores the password entirely (`index.ts:56-63`); the issued `token` is `crypto.randomUUID()`, never persisted, and `client.ts`'s `request()` attaches no `Authorization` header at all. Every signed-up user is added to the same single seeded "Demo Team" and every query pulls from that one team regardless of who's logged in.
+
+#### 5b-i. OAuth2 flow
+
+The frontend is a static export (no server-side code, deployed as static assets to `whisper-web`) — it can never hold the Google client secret. The token exchange must happen on the `whisper-api` Worker, which already owns request routing.
+
+1. Frontend: "Sign in with Google" button builds Google's authorization URL directly (`https://accounts.google.com/o/oauth2/v2/auth` with `client_id`, `redirect_uri` pointing at the **Worker**, `scope=openid email profile`, a random `state` value stashed in `sessionStorage` for CSRF verification) and does a full-page redirect. No secret needed for this step.
+2. Google redirects the browser to a new Worker route, `GET /api/auth/google/callback?code=...&state=...`.
+3. Worker verifies `state` isn't reused/expired (pass it through unchanged and compare, or encode+HMAC-sign it like the session token so no server-side state store is needed), then does a server-to-server `POST https://oauth2.googleapis.com/token` with `code`, `client_id`, `client_secret` (Worker secret), `redirect_uri`, `grant_type=authorization_code`.
+4. Google's response includes an `id_token` (a JWT). Since this exchange happened over a direct server-to-server HTTPS call to Google's own token endpoint (not a token handed to us by the browser), decoding the payload without a separate JWKS signature check is an acceptable simplification for this project's scope — note this explicitly as a deliberate scope cut, not an oversight, if it's ever reviewed.
+5. Extract `sub` (Google's stable user id), `email`, `name` from the decoded payload. Look up `user_account` by a new unique-indexed `google_sub` column (not `email` — `sub` is stable even if the Google account's email ever changes). If not found: create the user (encrypt `email`/`display_name`, compute the `email_lookup_hash`, generate `google_sub`), then auto-create their personal team (§5b-ii).
+6. Issue the same signed session token as before, then redirect the browser to a new frontend route, `https://whisper-web.../auth/callback#token=...` (fragment, not query string, so the token never hits server logs or `Referer` headers). That page reads the fragment, writes it into the existing `whisper.session` localStorage shape, and routes to `/dashboard`.
+
+#### 5b-ii. Per-user data isolation (personal teams)
+
+- On first-ever login for a `user_account`, create one `team` row (`team_name = "{displayName}'s workspace"`) and a `team_member` row for them as `'owner'` — no schema change, this is exactly what `ensureDemoSeed()` does today for the one hardcoded demo team, just per-user instead of global.
+- Every place that currently calls `getDemoTeamId()` instead resolves the **authenticated request's own team** (looked up via their `user_account_id` → `team_member`, or cached on the verified session token itself to skip the extra query).
+- Sharing a team with teammates (invites, multiple members) is not in scope here — one user, one personal team, exactly mirroring today's UX (single default team, no switcher) just scoped per person instead of globally shared.
+
+#### 5b-iii. Encryption
+
+New columns on `user_account` (migration, additive — no data loss for existing rows since this ships alongside the Google-only cutover, so existing plaintext demo/test rows can simply be treated as disposable rather than migrated in place):
+- `email_encrypted TEXT` — AES-256-GCM ciphertext (IV prepended, base64), replaces plaintext `email` for storage/display.
+- `email_lookup_hash TEXT UNIQUE` — `HMAC-SHA256(lowercased email, a second Worker secret)`, deterministic, this is what every `WHERE email = ?`-shaped lookup and the uniqueness constraint actually run against. One-way — can't be reversed back to the email.
+- `display_name_encrypted TEXT` — AES-256-GCM ciphertext, no lookup needed so no blind-index for this one.
+- `google_sub TEXT UNIQUE` — Google's opaque user id, plaintext (not sensitive, needs a fast unique lookup on every login).
+- `password_hash` stays in the schema, just goes fully unused — leaving a dead column is lower-risk than a destructive `DROP COLUMN` migration, and it documents that password auth used to exist here.
+- Two new Worker secrets: `PII_ENCRYPTION_KEY` (AES-256-GCM key) and `PII_LOOKUP_HMAC_KEY` (separate from both the encryption key and the existing session-token-signing secret — distinct keys per purpose is the point).
+- Every read of `user_account` that needs to *display* email/name decrypts at read time; every read that needs to *find* a user by email computes the lookup hash from the input and queries that column instead.
+
+#### 5b-iv. Manual setup checklist (you, not Claude — needs your Google account in a browser)
+
+1. Google Cloud Console → new project (or reuse an existing one) → **APIs & Services → OAuth consent screen** → configure it (app name, support email, scopes: `openid`, `email`, `profile`).
+2. **APIs & Services → Credentials → Create Credentials → OAuth client ID**, application type "Web application".
+3. Authorized redirect URI: `https://whisper-api.whisper-ai.workers.dev/api/auth/google/callback` (exact match required, including scheme/host/path).
+4. Copy the **Client ID** (safe to share, goes in frontend code / `wrangler.jsonc` `vars`) and **Client Secret** (never share — set directly with `wrangler secret put GOOGLE_CLIENT_SECRET` when this is implemented).
+5. While in Cloud Console, also generate two random 32-byte secrets for `PII_ENCRYPTION_KEY` and `PII_LOOKUP_HMAC_KEY` (e.g. `openssl rand -base64 32` locally — not a Google Cloud step, just do it at the same time) and set them the same way.
 
 **Frontend:**
-- `client.ts`'s `request()`: read the token from the existing `whisper.session` localStorage entry and attach `Authorization: Bearer <token>` to every call automatically.
-- `auth/context.tsx`: on a `401` response anywhere, clear the session and redirect to `/login` (session expired), not just on explicit logout.
-- `logout()` stays exactly as it is today — clearing localStorage — since there's no server-side session to also invalidate with this token design. If a real logout-everywhere need shows up later, that's what would force the stateful-session-table alternative instead.
-- Remove `t.auth.mockNotice` ("Demo mode: any input logs you in instantly.") from `login/page.tsx` and `dictionaries.ts` once this ships — it'll no longer be true.
+- Replace `login/page.tsx`'s email/password form with a single "Sign in with Google" button.
+- New route `app/auth/callback/page.tsx`: reads the token from the URL fragment, writes `whisper.session`, redirects to `/dashboard`.
+- `client.ts`'s `request()`: attach `Authorization: Bearer <token>` from `whisper.session` to every call (unchanged from the previous design).
+- `auth/context.tsx`: 401 anywhere → clear session, redirect to `/login` (unchanged).
+- Remove `t.auth.mockNotice` ("Demo mode: any input logs you in instantly.") from `dictionaries.ts` — no longer true.
+- Remove the now-dead `signup`/`login` (password) entries from `client.ts` and `dictionaries.ts`'s `auth` section.
 
 ### 5c. Smaller deferred items
 
@@ -145,7 +182,13 @@ Chosen shape: **stateless signed bearer token**, no new DB table, single shared 
 
 ### Later (designed above, implement directly from §5 when picked back up)
 - [ ] Soft delete: `DELETE`/`restore` endpoints, Trash view, confirm-dialog on delete
-- [ ] Real auth: password verification, signed bearer token, `Authorization` header on every request, 401-triggers-logout, remove the "Demo mode" notice
+- [ ] **You**: complete the Google Cloud OAuth setup checklist (§5b-iv) — blocks everything below
+- [ ] Migration: `email_encrypted`, `email_lookup_hash`, `display_name_encrypted`, `google_sub` columns on `user_account`
+- [ ] Backend: `GET /api/auth/google/callback` (code exchange, find-or-create user, personal-team auto-creation, issue session token)
+- [ ] Backend: AES-256-GCM encrypt/decrypt + HMAC lookup-hash helpers in `auth.ts`; wire every `user_account` read/write through them
+- [ ] Backend: replace every `getDemoTeamId()` call with the authenticated request's own team
+- [ ] Backend: `Authorization: Bearer <token>` verification on every route except `/health` and the OAuth routes
+- [ ] Frontend: "Sign in with Google" button replacing the password form; new `/auth/callback` route; remove dead password-auth code and the "Demo mode" notice
 - [ ] R2 upload storage (prerequisite for...)
 - [ ] Retry failed meeting
 - [ ] Search: D1 FTS5 migration + query endpoint + search box
