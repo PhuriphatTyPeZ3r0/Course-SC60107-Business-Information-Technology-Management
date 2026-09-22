@@ -16,6 +16,9 @@ interface AuthContextValue {
   /** Called by /auth/callback once it's parsed the token+user out of the
    * Google redirect's URL fragment - see DESIGN_SYSTEM.md 5b-i. */
   setSession: (session: Session) => void;
+  /** Patches just the user portion of the current session (e.g. after
+   * editing display name on /profile) - keeps the same token. */
+  updateUser: (user: AuthedUser) => void;
   logout: () => void;
 }
 
@@ -51,6 +54,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       session,
       isHydrated,
       setSession: (next) => writeLocalStorage(SESSION_STORAGE_KEY, JSON.stringify(next)),
+      updateUser: (user) => {
+        if (!session) return;
+        writeLocalStorage(SESSION_STORAGE_KEY, JSON.stringify({ ...session, user }));
+      },
       logout: () => writeLocalStorage(SESSION_STORAGE_KEY, null),
     }),
     [session, isHydrated],

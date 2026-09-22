@@ -3,7 +3,7 @@ export type Locale = "th" | "en";
 export const dictionaries = {
   th: {
     brand: "Whisper",
-    nav: { login: "เข้าสู่ระบบ", dashboard: "แดชบอร์ด", logout: "ออกจากระบบ" },
+    nav: { login: "เข้าสู่ระบบ", dashboard: "แดชบอร์ด", logout: "ออกจากระบบ", profile: "โปรไฟล์" },
     landing: {
       eyebrow: "AI สรุปการประชุมภาษาไทย",
       title: "ฟังประชุม สรุปงาน จบในที่เดียว",
@@ -57,6 +57,20 @@ export const dictionaries = {
       fileLabel: "ไฟล์เสียง (mp3, wav, flac)",
       submit: "เริ่มประมวลผล",
       submitting: "กำลังส่ง...",
+      personalLimitReached: "คุณใช้โควตาการประชุมของวันนี้ครบแล้ว (จำกัด {limit} ครั้ง/วัน) กรุณาลองใหม่พรุ่งนี้",
+      globalLimitReached: "ระบบเต็มชั่วคราว โควตาการประมวลผลของวันนี้หมดแล้ว กรุณาลองใหม่พรุ่งนี้",
+    },
+    profile: {
+      title: "โปรไฟล์",
+      subtitle: "ข้อมูลบัญชีและโควตาการใช้งานของคุณ",
+      email: "อีเมล",
+      displayNameLabel: "ชื่อที่แสดง",
+      save: "บันทึก",
+      saved: "บันทึกชื่อที่แสดงแล้ว",
+      usageTitle: "โควตาการใช้งานวันนี้",
+      usagePersonal: "การประชุมของคุณ",
+      usageGlobal: "การประชุมทั้งระบบ",
+      usageResetNote: "รีเซ็ตทุกเที่ยงคืน (UTC)",
     },
     meetingDetail: {
       processingTitle: "กำลังประมวลผลการประชุมของคุณ",
@@ -97,7 +111,7 @@ export const dictionaries = {
   },
   en: {
     brand: "Whisper",
-    nav: { login: "Log in", dashboard: "Dashboard", logout: "Log out" },
+    nav: { login: "Log in", dashboard: "Dashboard", logout: "Log out", profile: "Profile" },
     landing: {
       eyebrow: "AI meeting intelligence for Thai teams",
       title: "Hear the meeting. Ship the follow-up.",
@@ -151,6 +165,20 @@ export const dictionaries = {
       fileLabel: "Audio file (mp3, wav, flac)",
       submit: "Start processing",
       submitting: "Submitting...",
+      personalLimitReached: "You've used today's meeting quota (limit: {limit}/day). Please try again tomorrow.",
+      globalLimitReached: "The system is temporarily at capacity for today's processing quota. Please try again tomorrow.",
+    },
+    profile: {
+      title: "Profile",
+      subtitle: "Your account details and usage quota",
+      email: "Email",
+      displayNameLabel: "Display name",
+      save: "Save",
+      saved: "Display name saved",
+      usageTitle: "Today's usage",
+      usagePersonal: "Your meetings",
+      usageGlobal: "System-wide meetings",
+      usageResetNote: "Resets every midnight (UTC)",
     },
     meetingDetail: {
       processingTitle: "Processing your meeting",

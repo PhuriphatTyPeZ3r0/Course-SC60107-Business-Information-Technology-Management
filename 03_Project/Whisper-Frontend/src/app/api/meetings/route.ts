@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createMeeting, listMeetings } from "@/lib/server/mockStore";
+import { createMeeting, getUsageStatus, listMeetings, MockRateLimitError } from "@/lib/server/mockStore";
 
 export async function GET() {
   return NextResponse.json({ meetings: listMeetings() });
@@ -19,7 +19,20 @@ export async function POST(request: Request) {
   // pipeline with canned Thai transcript/summary content regardless. The
   // real backend (Process/Service.py) reads this same multipart body and
   // actually transcribes it.
-  const meeting = createMeeting({ title, sourceFileName });
-
-  return NextResponse.json({ meeting }, { status: 201 });
+  try {
+    const meeting = createMeeting({ title, sourceFileName });
+    return NextResponse.json({ meeting }, { status: 201 });
+  } catch (err) {
+    if (err instanceof MockRateLimitError) {
+      const message =
+        err.reason === "global"
+          ? "ระบบเต็มชั่วคราว โควตาการประมวลผลของวันนี้หมดแล้ว กรุณาลองใหม่พรุ่งนี้"
+          : "คุณใช้โควตาการประชุมของวันนี้ครบแล้ว กรุณาลองใหม่พรุ่งนี้";
+      return NextResponse.json(
+        { error: { code: "RATE_LIMITED", reason: err.reason, message }, usage: getUsageStatus() },
+        { status: 429 },
+      );
+    }
+    throw err;
+  }
 }

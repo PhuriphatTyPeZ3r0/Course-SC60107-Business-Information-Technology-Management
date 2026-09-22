@@ -10,11 +10,20 @@ import type {
   Participant,
   Summary,
   Transcript,
+  UsageStatus,
   User,
 } from "./types";
 
 const now = () => new Date().toISOString();
 const newId = (prefix: string) => `${prefix}_${crypto.randomUUID()}`;
+const todayUtc = () => new Date().toISOString().slice(0, 10);
+
+// Neurons/day is an account-wide Workers AI free-tier budget shared by every
+// user, not per-user - see DESIGN_SYSTEM.md's rate-limit grilling session.
+// PERSONAL is a fair-use cap per user; GLOBAL is a hard stop with margin
+// below Cloudflare's actual free-tier ceiling.
+const PERSONAL_DAILY_LIMIT = 2;
+const GLOBAL_DAILY_LIMIT = 6;
 
 /** Finds a user by their Google `sub` (stable even if their Google email
  * ever changes - see DESIGN_SYSTEM.md 5b-i), creating one plus a personal
@@ -25,17 +34,29 @@ const newId = (prefix: string) => `${prefix}_${crypto.randomUUID()}`;
  * lives in the *_encrypted columns from here on. */
 export async function findOrCreateGoogleUser(
   db: D1Database,
-  input: { googleSub: string; email: string; displayName: string },
+  input: { googleSub: string; email: string; displayName: string; avatarUrl: string | null },
   keys: { encryptionKey: string; hmacKey: string },
-): Promise<{ id: string; teamId: string; email: string; displayName: string }> {
+): Promise<{ id: string; teamId: string; email: string; displayName: string; avatarUrl: string | null }> {
   const existing = await db
-    .prepare("SELECT user_account_id FROM user_account WHERE google_sub = ?")
+    .prepare("SELECT user_account_id, display_name_encrypted FROM user_account WHERE google_sub = ?")
     .bind(input.googleSub)
-    .first<{ user_account_id: string }>();
+    .first<{ user_account_id: string; display_name_encrypted: string | null }>();
 
   let userId: string;
+  let displayName = input.displayName;
   if (existing) {
     userId = existing.user_account_id;
+    // Avatar re-syncs from Google on every login (never user-edited). Display
+    // name deliberately does NOT re-sync here - it's only set once, below, on
+    // creation - so a user's own edit (updateDisplayName) survives future
+    // logins instead of being clobbered by Google's name each time.
+    await db
+      .prepare("UPDATE user_account SET avatar_url = ?, updated_at = ? WHERE user_account_id = ?")
+      .bind(input.avatarUrl, now(), userId)
+      .run();
+    if (existing.display_name_encrypted) {
+      displayName = await decryptPII(existing.display_name_encrypted, keys.encryptionKey);
+    }
   } else {
     userId = newId("user");
     const ts = now();
@@ -47,8 +68,8 @@ export async function findOrCreateGoogleUser(
     await db
       .prepare(
         "INSERT INTO user_account (user_account_id, email, password_hash, display_name, " +
-          "email_encrypted, email_lookup_hash, display_name_encrypted, google_sub, created_at, updated_at) " +
-          "VALUES (?, ?, '', '', ?, ?, ?, ?, ?, ?)",
+          "email_encrypted, email_lookup_hash, display_name_encrypted, google_sub, avatar_url, created_at, updated_at) " +
+          "VALUES (?, ?, '', '', ?, ?, ?, ?, ?, ?, ?)",
       )
       .bind(
         userId,
@@ -57,14 +78,15 @@ export async function findOrCreateGoogleUser(
         emailHash,
         displayNameEncrypted,
         input.googleSub,
+        input.avatarUrl,
         ts,
         ts,
       )
       .run();
   }
 
-  const teamId = await ensurePersonalTeam(db, userId, input.displayName);
-  return { id: userId, teamId, email: input.email, displayName: input.displayName };
+  const teamId = await ensurePersonalTeam(db, userId, displayName);
+  return { id: userId, teamId, email: input.email, displayName, avatarUrl: input.avatarUrl };
 }
 
 async function ensurePersonalTeam(db: D1Database, userId: string, displayName: string): Promise<string> {
@@ -96,15 +118,107 @@ export async function getUserById(
   encryptionKey: string,
 ): Promise<User | null> {
   const row = await db
-    .prepare("SELECT user_account_id, email_encrypted, display_name_encrypted FROM user_account WHERE user_account_id = ? AND is_active")
+    .prepare(
+      "SELECT user_account_id, email_encrypted, display_name_encrypted, avatar_url FROM user_account " +
+        "WHERE user_account_id = ? AND is_active",
+    )
     .bind(userId)
-    .first<{ user_account_id: string; email_encrypted: string | null; display_name_encrypted: string | null }>();
+    .first<{
+      user_account_id: string;
+      email_encrypted: string | null;
+      display_name_encrypted: string | null;
+      avatar_url: string | null;
+    }>();
   if (!row || !row.email_encrypted || !row.display_name_encrypted) return null;
   const [email, displayName] = await Promise.all([
     decryptPII(row.email_encrypted, encryptionKey),
     decryptPII(row.display_name_encrypted, encryptionKey),
   ]);
-  return { id: row.user_account_id, email, displayName };
+  return { id: row.user_account_id, email, displayName, avatarUrl: row.avatar_url };
+}
+
+/** display_name is user-editable from the profile page (Google's own name
+ * only ever seeds it once, on account creation - see findOrCreateGoogleUser).
+ * Basic length validation only; it's a display label, not a lookup key. */
+export async function updateDisplayName(
+  db: D1Database,
+  userId: string,
+  displayName: string,
+  encryptionKey: string,
+): Promise<void> {
+  const displayNameEncrypted = await encryptPII(displayName, encryptionKey);
+  await db
+    .prepare("UPDATE user_account SET display_name_encrypted = ?, updated_at = ? WHERE user_account_id = ?")
+    .bind(displayNameEncrypted, now(), userId)
+    .run();
+}
+
+export async function getUsageStatus(db: D1Database, userId: string): Promise<UsageStatus> {
+  const date = todayUtc();
+  const [personalRow, globalRow] = await Promise.all([
+    db
+      .prepare("SELECT meeting_count FROM usage_daily WHERE user_account_id = ? AND usage_date = ?")
+      .bind(userId, date)
+      .first<{ meeting_count: number }>(),
+    db
+      .prepare("SELECT meeting_count FROM usage_global_daily WHERE usage_date = ?")
+      .bind(date)
+      .first<{ meeting_count: number }>(),
+  ]);
+  return {
+    personal: { used: personalRow?.meeting_count ?? 0, limit: PERSONAL_DAILY_LIMIT },
+    global: { used: globalRow?.meeting_count ?? 0, limit: GLOBAL_DAILY_LIMIT },
+  };
+}
+
+/** Checked before every meeting creation. Global is checked/incremented
+ * first since it's the tighter, shared constraint (Neurons/day is an
+ * account-wide budget - see DESIGN_SYSTEM.md's rate-limit grilling session).
+ * Each UPSERT's own `WHERE meeting_count < limit` guards against a
+ * concurrent request pushing past the cap between this function's read and
+ * write. If the global write succeeds but the personal write is then
+ * rejected by a race, the global counter ends up very slightly over-counted
+ * relative to meetings actually created - an acceptable trade at this
+ * traffic scale (max 6/day) rather than risking under-enforcement. */
+export async function checkAndIncrementUsage(
+  db: D1Database,
+  userId: string,
+): Promise<{ allowed: boolean; reason?: "personal" | "global"; status: UsageStatus }> {
+  const date = todayUtc();
+  const status = await getUsageStatus(db, userId);
+
+  if (status.global.used >= GLOBAL_DAILY_LIMIT) return { allowed: false, reason: "global", status };
+  if (status.personal.used >= PERSONAL_DAILY_LIMIT) return { allowed: false, reason: "personal", status };
+
+  const [globalResult, personalResult] = await db.batch([
+    db
+      .prepare(
+        "INSERT INTO usage_global_daily (usage_date, meeting_count) VALUES (?, 1) " +
+          "ON CONFLICT (usage_date) DO UPDATE SET meeting_count = meeting_count + 1 WHERE meeting_count < ?",
+      )
+      .bind(date, GLOBAL_DAILY_LIMIT),
+    db
+      .prepare(
+        "INSERT INTO usage_daily (user_account_id, usage_date, meeting_count) VALUES (?, ?, 1) " +
+          "ON CONFLICT (user_account_id, usage_date) DO UPDATE SET meeting_count = meeting_count + 1 WHERE meeting_count < ?",
+      )
+      .bind(userId, date, PERSONAL_DAILY_LIMIT),
+  ]);
+
+  if (globalResult.meta.changes === 0) {
+    return { allowed: false, reason: "global", status: await getUsageStatus(db, userId) };
+  }
+  if (personalResult.meta.changes === 0) {
+    return { allowed: false, reason: "personal", status: await getUsageStatus(db, userId) };
+  }
+
+  return {
+    allowed: true,
+    status: {
+      personal: { used: status.personal.used + 1, limit: PERSONAL_DAILY_LIMIT },
+      global: { used: status.global.used + 1, limit: GLOBAL_DAILY_LIMIT },
+    },
+  };
 }
 
 export async function createMeetingWithJobs(

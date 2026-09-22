@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icon";
 import { buttonVariants } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,12 +33,17 @@ export function DashboardNav() {
           <DropdownMenu>
             <DropdownMenuTrigger className={buttonVariants({ variant: "ghost", size: "icon", className: "rounded-full" })}>
               <Avatar className="size-8">
+                {session?.user.avatarUrl && <AvatarImage src={session.user.avatarUrl} alt={session.user.displayName} />}
                 <AvatarFallback className="bg-primary/20 text-primary text-xs">
                   {initials}
                 </AvatarFallback>
               </Avatar>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => router.push("/dashboard/profile")}>
+                <Icon name="person" className="mr-2 text-[16px]" />
+                {t.nav.profile}
+              </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => {
                   logout();

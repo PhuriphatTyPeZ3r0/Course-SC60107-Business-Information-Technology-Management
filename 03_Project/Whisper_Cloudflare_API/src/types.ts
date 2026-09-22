@@ -10,6 +10,17 @@ export interface User {
   id: string;
   email: string;
   displayName: string;
+  avatarUrl: string | null;
+}
+
+export interface UsageLimit {
+  used: number;
+  limit: number;
+}
+
+export interface UsageStatus {
+  personal: UsageLimit;
+  global: UsageLimit;
 }
 
 export interface Participant {

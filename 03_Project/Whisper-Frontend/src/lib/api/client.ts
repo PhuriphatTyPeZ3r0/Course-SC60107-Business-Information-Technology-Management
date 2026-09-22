@@ -1,4 +1,4 @@
-import type { ActionItem, ActionItemStatus, Meeting, MeetingSummaryView } from "@/lib/types";
+import type { ActionItem, ActionItemStatus, Meeting, MeetingSummaryView, UsageStatus, User } from "@/lib/types";
 
 // Every call goes through this base URL. It defaults to "" (same-origin),
 // which hits the mock Next.js Route Handlers under app/api/**. Once the
@@ -32,6 +32,24 @@ function clearSessionAndRedirectToLogin() {
   window.location.href = "/login";
 }
 
+// Carries the structured error body (code/reason/usage) alongside the
+// message, so callers like the new-meeting page can branch on RATE_LIMITED
+// vs any other failure and read the fresh usage snapshot the 429 body
+// includes, instead of making a second request just to re-fetch it.
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+  reason?: string;
+  usage?: UsageStatus;
+  constructor(message: string, status: number, code?: string, reason?: string, usage?: UsageStatus) {
+    super(message);
+    this.status = status;
+    this.code = code;
+    this.reason = reason;
+    this.usage = usage;
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   // Don't force a JSON content-type on FormData bodies — the browser needs
   // to set its own multipart boundary.
@@ -54,7 +72,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body?.error?.message ?? body?.error ?? `Request failed: ${res.status}`);
+    throw new ApiError(
+      body?.error?.message ?? body?.error ?? `Request failed: ${res.status}`,
+      res.status,
+      body?.error?.code,
+      body?.error?.reason,
+      body?.usage,
+    );
   }
 
   return res.json() as Promise<T>;
@@ -64,6 +88,7 @@ export interface AuthedUser {
   id: string;
   email: string;
   displayName: string;
+  avatarUrl: string | null;
 }
 
 export const api = {
@@ -88,6 +113,16 @@ export const api = {
    * redirect URI is the deployed Worker's), so this hits the mock's login
    * route directly instead of redirecting to Google at all. */
   mockGoogleSignIn: () => request<{ token: string; user: AuthedUser }>("/api/auth/login", { method: "POST" }),
+
+  getProfile: () => request<{ user: User; usage: UsageStatus }>("/api/profile"),
+
+  updateDisplayName: (displayName: string) =>
+    request<{ user: User; usage: UsageStatus }>("/api/profile", {
+      method: "PATCH",
+      body: JSON.stringify({ displayName }),
+    }),
+
+  getUsageToday: () => request<{ usage: UsageStatus }>("/api/usage/today"),
 
   listMeetings: () => request<{ meetings: MeetingSummaryView[] }>("/api/meetings"),
 

@@ -8,8 +8,15 @@ import type {
   Participant,
   SpeakerSegment,
   Team,
+  UsageStatus,
   User,
 } from "@/lib/types";
+
+// Mirrors the real backend's caps (see Whisper_Cloudflare_API/src/db.ts) so
+// the local mock demos the same rate-limit UX without needing a real
+// Cloudflare deployment.
+const PERSONAL_DAILY_LIMIT = 2;
+const GLOBAL_DAILY_LIMIT = 6;
 
 // In-memory mock backend. Lives for the lifetime of the Next.js dev/server
 // process — good enough to demo the full flow locally (see the "local dev
@@ -25,6 +32,7 @@ export const DEMO_USER: User = {
   id: "user_demo",
   email: "demo@whisper.app",
   displayName: "Demo User",
+  avatarUrl: null,
 };
 
 export const DEMO_TEAM: Team = {
@@ -163,12 +171,26 @@ function materialize(meeting: Meeting): Meeting {
 
 interface Store {
   meetings: Map<string, Meeting>;
+  displayName: string;
+  usageDate: string;
+  personalUsed: number;
+  globalUsed: number;
 }
 
 const globalForStore = globalThis as unknown as { __whisperStore?: Store };
 
+function todayUtc(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 function seedStore(): Store {
-  const store: Store = { meetings: new Map() };
+  const store: Store = {
+    meetings: new Map(),
+    displayName: DEMO_USER.displayName,
+    usageDate: todayUtc(),
+    personalUsed: 0,
+    globalUsed: 0,
+  };
   const seedMeeting = createMeetingInternal(store, {
     title: "ประชุมทีมผลิตภัณฑ์ประจำสัปดาห์",
     sourceFileName: "weekly-sync-2026-09-18.wav",
@@ -242,8 +264,51 @@ export function getMeeting(id: string): Meeting | null {
   return meeting ? materialize(meeting) : null;
 }
 
+export class MockRateLimitError extends Error {
+  reason: "personal" | "global";
+  constructor(reason: "personal" | "global") {
+    super(`Rate limited: ${reason}`);
+    this.reason = reason;
+  }
+}
+
+function resetUsageIfNewDay(store: Store) {
+  const today = todayUtc();
+  if (store.usageDate !== today) {
+    store.usageDate = today;
+    store.personalUsed = 0;
+    store.globalUsed = 0;
+  }
+}
+
+export function getUsageStatus(): UsageStatus {
+  const store = getStore();
+  resetUsageIfNewDay(store);
+  return {
+    personal: { used: store.personalUsed, limit: PERSONAL_DAILY_LIMIT },
+    global: { used: store.globalUsed, limit: GLOBAL_DAILY_LIMIT },
+  };
+}
+
+export function getProfile(): User {
+  const store = getStore();
+  return { ...DEMO_USER, displayName: store.displayName };
+}
+
+export function updateDisplayName(displayName: string): User {
+  const store = getStore();
+  store.displayName = displayName;
+  return { ...DEMO_USER, displayName: store.displayName };
+}
+
 export function createMeeting(input: { title: string; sourceFileName: string | null }): Meeting {
   const store = getStore();
+  resetUsageIfNewDay(store);
+  if (store.globalUsed >= GLOBAL_DAILY_LIMIT) throw new MockRateLimitError("global");
+  if (store.personalUsed >= PERSONAL_DAILY_LIMIT) throw new MockRateLimitError("personal");
+  store.globalUsed += 1;
+  store.personalUsed += 1;
+
   const meeting = createMeetingInternal(store, input);
   store.meetings.set(meeting.id, meeting);
   return materialize(meeting);

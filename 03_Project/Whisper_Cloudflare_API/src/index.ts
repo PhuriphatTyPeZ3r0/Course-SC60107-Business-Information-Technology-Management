@@ -80,6 +80,7 @@ interface GoogleIdTokenPayload {
   email?: string;
   email_verified?: boolean;
   name?: string;
+  picture?: string;
 }
 
 /** No JWKS signature check - this id_token came from a direct
@@ -147,14 +148,60 @@ async function handleGoogleCallback(request: Request, env: Env, origin: string):
 
   const user = await db.findOrCreateGoogleUser(
     env.DB,
-    { googleSub: payload.sub, email: payload.email, displayName: payload.name ?? payload.email },
+    {
+      googleSub: payload.sub,
+      email: payload.email,
+      displayName: payload.name ?? payload.email,
+      avatarUrl: payload.picture ?? null,
+    },
     { encryptionKey: env.PII_ENCRYPTION_KEY, hmacKey: env.PII_LOOKUP_HMAC_KEY },
   );
 
   const token = await signSessionToken(user.id, user.teamId, env.AUTH_SECRET);
-  const userBlob = base64UrlEncodeJson({ id: user.id, email: user.email, displayName: user.displayName });
+  const userBlob = base64UrlEncodeJson({
+    id: user.id,
+    email: user.email,
+    displayName: user.displayName,
+    avatarUrl: user.avatarUrl,
+  });
   const location = `${env.CORS_ORIGIN}/auth/callback#token=${encodeURIComponent(token)}&user=${encodeURIComponent(userBlob)}`;
   return new Response(null, { status: 302, headers: { Location: location } });
+}
+
+// --- Profile / usage ---------------------------------------------------------
+
+interface ProfilePatchBody {
+  displayName?: string;
+}
+
+async function handleGetProfile(auth: Auth, env: Env, origin: string): Promise<Response> {
+  const [user, usage] = await Promise.all([
+    db.getUserById(env.DB, auth.userId, env.PII_ENCRYPTION_KEY),
+    db.getUsageStatus(env.DB, auth.userId),
+  ]);
+  if (!user) return errorJson("NOT_FOUND", "User not found", 404, origin);
+  return json({ user, usage }, 200, origin);
+}
+
+async function handlePatchProfile(request: Request, auth: Auth, env: Env, origin: string): Promise<Response> {
+  const body = await readJson<ProfilePatchBody>(request);
+  const displayName = body.displayName?.trim();
+  if (!displayName || displayName.length > 100) {
+    return errorJson("INVALID_REQUEST", "displayName must be 1-100 characters", 400, origin);
+  }
+
+  await db.updateDisplayName(env.DB, auth.userId, displayName, env.PII_ENCRYPTION_KEY);
+  const [user, usage] = await Promise.all([
+    db.getUserById(env.DB, auth.userId, env.PII_ENCRYPTION_KEY),
+    db.getUsageStatus(env.DB, auth.userId),
+  ]);
+  if (!user) return errorJson("NOT_FOUND", "User not found", 404, origin);
+  return json({ user, usage }, 200, origin);
+}
+
+async function handleGetUsage(auth: Auth, env: Env, origin: string): Promise<Response> {
+  const usage = await db.getUsageStatus(env.DB, auth.userId);
+  return json({ usage }, 200, origin);
 }
 
 // --- Meetings / action items -----------------------------------------------
@@ -184,6 +231,19 @@ async function handleCreateMeeting(request: Request, auth: Auth, env: Env, origi
   }
   if (file.size > MAX_FILE_SIZE_BYTES) {
     return errorJson("FILE_TOO_LARGE", `File exceeds ${MAX_FILE_SIZE_BYTES / (1024 * 1024)}MB`, 413, origin);
+  }
+
+  // Checked (and incremented) before the AI pipeline runs, not after -
+  // Neurons are spent the moment transcription/summarization is attempted,
+  // so the cap has to gate entry, not just record outcome. See
+  // DESIGN_SYSTEM.md's rate-limit grilling session.
+  const usageCheck = await db.checkAndIncrementUsage(env.DB, auth.userId);
+  if (!usageCheck.allowed) {
+    const message =
+      usageCheck.reason === "global"
+        ? "ระบบเต็มชั่วคราว โควตาการประมวลผลของวันนี้หมดแล้ว กรุณาลองใหม่พรุ่งนี้"
+        : "คุณใช้โควตาการประชุมของวันนี้ครบแล้ว กรุณาลองใหม่พรุ่งนี้";
+    return json({ error: { code: "RATE_LIMITED", reason: usageCheck.reason, message }, usage: usageCheck.status }, 429, origin);
   }
 
   const audio = await file.arrayBuffer();
@@ -299,6 +359,10 @@ export default {
 
       const auth = await requireAuth(request, env);
       if (!auth) return errorJson("UNAUTHORIZED", "Missing or invalid session", 401, origin);
+
+      if (method === "GET" && pathname === "/api/profile") return await handleGetProfile(auth, env, origin);
+      if (method === "PATCH" && pathname === "/api/profile") return await handlePatchProfile(request, auth, env, origin);
+      if (method === "GET" && pathname === "/api/usage/today") return await handleGetUsage(auth, env, origin);
 
       if (method === "GET" && pathname === "/api/meetings") return await handleListMeetings(auth, env, origin);
       if (method === "POST" && pathname === "/api/meetings") return await handleCreateMeeting(request, auth, env, origin);
