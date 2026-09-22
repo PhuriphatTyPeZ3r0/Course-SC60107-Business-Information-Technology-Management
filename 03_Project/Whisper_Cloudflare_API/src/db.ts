@@ -1,4 +1,4 @@
-import { hashPassword } from "./auth";
+import { decryptPII, emailLookupHash, encryptPII } from "./auth";
 import type {
   ActionItem,
   ActionItemStatus,
@@ -13,104 +13,103 @@ import type {
   User,
 } from "./types";
 
-export const DEMO_USER_EMAIL = "demo@whisper.app";
-const DEMO_USER_DISPLAY_NAME = "Demo User";
-const DEMO_TEAM_NAME = "Demo Team";
-
-export class DuplicateEmailError extends Error {}
-
 const now = () => new Date().toISOString();
 const newId = (prefix: string) => `${prefix}_${crypto.randomUUID()}`;
 
-let cachedDemoTeamId: string | null = null;
-
-export async function ensureDemoSeed(db: D1Database): Promise<{ teamId: string; userId: string }> {
-  let team = await db
-    .prepare("SELECT team_id FROM team WHERE team_name = ? AND deleted_at IS NULL")
-    .bind(DEMO_TEAM_NAME)
-    .first<{ team_id: string }>();
-
-  let teamId = team?.team_id ?? null;
-  if (!teamId) {
-    teamId = newId("team");
-    await db
-      .prepare("INSERT INTO team (team_id, team_name, created_at, updated_at) VALUES (?, ?, ?, ?)")
-      .bind(teamId, DEMO_TEAM_NAME, now(), now())
-      .run();
-  }
-
-  let user = await db
-    .prepare("SELECT user_account_id FROM user_account WHERE email = ?")
-    .bind(DEMO_USER_EMAIL)
+/** Finds a user by their Google `sub` (stable even if their Google email
+ * ever changes - see DESIGN_SYSTEM.md 5b-i), creating one plus a personal
+ * team (5b-ii) on first login. Legacy `email`/`password_hash`/`display_name`
+ * columns (pre-dating Google SSO, kept per 5b-iii rather than a destructive
+ * migration) still have NOT NULL/UNIQUE constraints from the original
+ * schema, so new rows get inert placeholders there - real data only ever
+ * lives in the *_encrypted columns from here on. */
+export async function findOrCreateGoogleUser(
+  db: D1Database,
+  input: { googleSub: string; email: string; displayName: string },
+  keys: { encryptionKey: string; hmacKey: string },
+): Promise<{ id: string; teamId: string; email: string; displayName: string }> {
+  const existing = await db
+    .prepare("SELECT user_account_id FROM user_account WHERE google_sub = ?")
+    .bind(input.googleSub)
     .first<{ user_account_id: string }>();
 
-  let userId = user?.user_account_id ?? null;
-  if (!userId) {
+  let userId: string;
+  if (existing) {
+    userId = existing.user_account_id;
+  } else {
     userId = newId("user");
-    const passwordHash = await hashPassword("demo");
+    const ts = now();
+    const [emailEncrypted, emailHash, displayNameEncrypted] = await Promise.all([
+      encryptPII(input.email, keys.encryptionKey),
+      emailLookupHash(input.email, keys.hmacKey),
+      encryptPII(input.displayName, keys.encryptionKey),
+    ]);
     await db
       .prepare(
-        "INSERT INTO user_account (user_account_id, email, password_hash, display_name, created_at, updated_at) " +
-          "VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO user_account (user_account_id, email, password_hash, display_name, " +
+          "email_encrypted, email_lookup_hash, display_name_encrypted, google_sub, created_at, updated_at) " +
+          "VALUES (?, ?, '', '', ?, ?, ?, ?, ?, ?)",
       )
-      .bind(userId, DEMO_USER_EMAIL, passwordHash, DEMO_USER_DISPLAY_NAME, now(), now())
+      .bind(
+        userId,
+        `${input.googleSub}@google-sso.invalid`, // legacy column placeholder, never read
+        emailEncrypted,
+        emailHash,
+        displayNameEncrypted,
+        input.googleSub,
+        ts,
+        ts,
+      )
       .run();
   }
 
-  await db
+  const teamId = await ensurePersonalTeam(db, userId, input.displayName);
+  return { id: userId, teamId, email: input.email, displayName: input.displayName };
+}
+
+async function ensurePersonalTeam(db: D1Database, userId: string, displayName: string): Promise<string> {
+  const existing = await db
     .prepare(
-      "INSERT INTO team_member (team_id, user_account_id, role, joined_at) VALUES (?, ?, 'owner', ?) " +
-        "ON CONFLICT DO NOTHING",
+      "SELECT tm.team_id FROM team_member tm JOIN team t ON t.team_id = tm.team_id " +
+        "WHERE tm.user_account_id = ? AND t.deleted_at IS NULL LIMIT 1",
     )
-    .bind(teamId, userId, now())
-    .run();
+    .bind(userId)
+    .first<{ team_id: string }>();
+  if (existing) return existing.team_id;
 
-  cachedDemoTeamId = teamId;
-  return { teamId, userId };
+  const teamId = newId("team");
+  const ts = now();
+  await db.batch([
+    db
+      .prepare("INSERT INTO team (team_id, team_name, created_at, updated_at) VALUES (?, ?, ?, ?)")
+      .bind(teamId, `${displayName}'s workspace`, ts, ts),
+    db
+      .prepare("INSERT INTO team_member (team_id, user_account_id, role, joined_at) VALUES (?, ?, 'owner', ?)")
+      .bind(teamId, userId, ts),
+  ]);
+  return teamId;
 }
 
-export function getDemoTeamId(): string {
-  if (!cachedDemoTeamId) throw new Error("ensureDemoSeed() has not run yet");
-  return cachedDemoTeamId;
-}
-
-export async function getUserByEmail(db: D1Database, email: string): Promise<User | null> {
-  const row = await db
-    .prepare("SELECT user_account_id, email, display_name FROM user_account WHERE lower(email) = lower(?) AND is_active")
-    .bind(email)
-    .first<{ user_account_id: string; email: string; display_name: string }>();
-  if (!row) return null;
-  return { id: row.user_account_id, email: row.email, displayName: row.display_name };
-}
-
-export async function createUserAccount(
+export async function getUserById(
   db: D1Database,
-  email: string,
-  password: string,
-  displayName: string,
-): Promise<User> {
-  const existing = await getUserByEmail(db, email);
-  if (existing) throw new DuplicateEmailError(email);
-
-  const userId = newId("user");
-  const passwordHash = await hashPassword(password);
-  await db
-    .prepare(
-      "INSERT INTO user_account (user_account_id, email, password_hash, display_name, created_at, updated_at) " +
-        "VALUES (?, ?, ?, ?, ?, ?)",
-    )
-    .bind(userId, email, passwordHash, displayName, now(), now())
-    .run();
-  await db
-    .prepare("INSERT INTO team_member (team_id, user_account_id, role, joined_at) VALUES (?, ?, 'member', ?)")
-    .bind(getDemoTeamId(), userId, now())
-    .run();
-
-  return { id: userId, email, displayName };
+  userId: string,
+  encryptionKey: string,
+): Promise<User | null> {
+  const row = await db
+    .prepare("SELECT user_account_id, email_encrypted, display_name_encrypted FROM user_account WHERE user_account_id = ? AND is_active")
+    .bind(userId)
+    .first<{ user_account_id: string; email_encrypted: string | null; display_name_encrypted: string | null }>();
+  if (!row || !row.email_encrypted || !row.display_name_encrypted) return null;
+  const [email, displayName] = await Promise.all([
+    decryptPII(row.email_encrypted, encryptionKey),
+    decryptPII(row.display_name_encrypted, encryptionKey),
+  ]);
+  return { id: row.user_account_id, email, displayName };
 }
 
 export async function createMeetingWithJobs(
   db: D1Database,
+  teamId: string,
   ownerUserId: string,
   title: string,
   sourceFileName: string | null,
@@ -129,7 +128,7 @@ export async function createMeetingWithJobs(
         "INSERT INTO meeting (meeting_id, team_id, owner_user_account_id, title, meeting_date, language_code, " +
           "status, source_file_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'th', 'processing', ?, ?, ?)",
       )
-      .bind(meetingId, getDemoTeamId(), ownerUserId, title, ts, sourceFileName, ts, ts),
+      .bind(meetingId, teamId, ownerUserId, title, ts, sourceFileName, ts, ts),
     ...(Object.entries(jobIds) as [JobType, string][]).map(([jobType, jobId]) =>
       db
         .prepare(
@@ -396,36 +395,45 @@ async function fetchMeetingFullFromRow(db: D1Database, meeting: MeetingRow): Pro
   };
 }
 
-export async function getMeetingFull(db: D1Database, meetingId: string): Promise<Meeting | null> {
+/** teamId is required and checked in the WHERE clause, not just by the
+ * caller - this is what actually enforces per-user data isolation (see
+ * DESIGN_SYSTEM.md 5b-ii). A meeting that exists but belongs to a
+ * different team returns null here, same as a meeting that doesn't exist
+ * at all, so the API's 404 never leaks which case it was. */
+export async function getMeetingFull(db: D1Database, meetingId: string, teamId: string): Promise<Meeting | null> {
   const meeting = await db
     .prepare(
       "SELECT meeting_id, team_id, owner_user_account_id, title, meeting_date, language_code, status, " +
-        "created_at, source_file_name FROM meeting WHERE meeting_id = ? AND deleted_at IS NULL",
+        "created_at, source_file_name FROM meeting WHERE meeting_id = ? AND team_id = ? AND deleted_at IS NULL",
     )
-    .bind(meetingId)
+    .bind(meetingId, teamId)
     .first<MeetingRow>();
   if (!meeting) return null;
   return fetchMeetingFullFromRow(db, meeting);
 }
 
-export async function listTeamMeetings(db: D1Database): Promise<Meeting[]> {
+export async function listTeamMeetings(db: D1Database, teamId: string): Promise<Meeting[]> {
   const { results } = await db
     .prepare(
       "SELECT meeting_id, team_id, owner_user_account_id, title, meeting_date, language_code, status, " +
         "created_at, source_file_name FROM meeting WHERE team_id = ? AND deleted_at IS NULL ORDER BY created_at DESC",
     )
-    .bind(getDemoTeamId())
+    .bind(teamId)
     .all<MeetingRow>();
   return Promise.all(results.map((row) => fetchMeetingFullFromRow(db, row)));
 }
 
-async function fetchActionItemById(db: D1Database, actionItemId: string): Promise<ActionItem | null> {
+/** Joins to meeting to enforce the same per-team isolation as
+ * getMeetingFull() - an action item ID alone isn't enough, it must also
+ * belong to a meeting owned by teamId. */
+async function fetchActionItemById(db: D1Database, actionItemId: string, teamId: string): Promise<ActionItem | null> {
   const row = await db
     .prepare(
-      "SELECT action_item_id, meeting_id, description, due_date, status, assignee_name " +
-        "FROM action_item WHERE action_item_id = ? AND deleted_at IS NULL",
+      "SELECT a.action_item_id, a.meeting_id, a.description, a.due_date, a.status, a.assignee_name " +
+        "FROM action_item a JOIN meeting m ON m.meeting_id = a.meeting_id " +
+        "WHERE a.action_item_id = ? AND a.deleted_at IS NULL AND m.team_id = ?",
     )
-    .bind(actionItemId)
+    .bind(actionItemId, teamId)
     .first<{
       action_item_id: number;
       meeting_id: string;
@@ -445,9 +453,13 @@ async function fetchActionItemById(db: D1Database, actionItemId: string): Promis
   };
 }
 
+/** Caller (index.ts) must have already verified meetingId belongs to
+ * teamId via getMeetingFull() before calling this - teamId is only taken
+ * here so fetchActionItemById()'s join check has something to match. */
 export async function createActionItem(
   db: D1Database,
   meetingId: string,
+  teamId: string,
   input: { description: string; assigneeName: string | null; dueDate: string | null },
 ): Promise<ActionItem> {
   const ts = now();
@@ -458,7 +470,7 @@ export async function createActionItem(
     )
     .bind(meetingId, input.description, input.assigneeName, input.dueDate, ts, ts)
     .run();
-  const actionItem = await fetchActionItemById(db, String(result.meta.last_row_id));
+  const actionItem = await fetchActionItemById(db, String(result.meta.last_row_id), teamId);
   if (!actionItem) throw new Error("createActionItem: insert succeeded but row not found");
   return actionItem;
 }
@@ -466,8 +478,23 @@ export async function createActionItem(
 export async function updateActionItem(
   db: D1Database,
   actionItemId: string,
+  teamId: string,
   patch: { description?: string; assigneeName?: string | null; dueDate?: string | null; status?: ActionItemStatus },
 ): Promise<ActionItem | null> {
+  // Ownership check happens here, before any write - not just when reading
+  // the result back afterward, otherwise a guessed ID from another team
+  // could be modified even though it could never be read back.
+  const existing = await fetchActionItemById(db, actionItemId, teamId);
+  if (!existing) return null;
+  if (
+    patch.description === undefined &&
+    patch.assigneeName === undefined &&
+    patch.dueDate === undefined &&
+    patch.status === undefined
+  ) {
+    return existing;
+  }
+
   const fields: string[] = [];
   const values: unknown[] = [];
   if (patch.description !== undefined) {
@@ -486,7 +513,6 @@ export async function updateActionItem(
     fields.push("status = ?");
     values.push(patch.status);
   }
-  if (fields.length === 0) return fetchActionItemById(db, actionItemId);
 
   fields.push("updated_at = ?");
   values.push(now());
@@ -495,12 +521,20 @@ export async function updateActionItem(
     .prepare(`UPDATE action_item SET ${fields.join(", ")} WHERE action_item_id = ?`)
     .bind(...values)
     .run();
-  return fetchActionItemById(db, actionItemId);
+  return fetchActionItemById(db, actionItemId, teamId);
 }
 
-export async function updateMeetingTitle(db: D1Database, meetingId: string, title: string): Promise<void> {
-  await db
-    .prepare("UPDATE meeting SET title = ?, updated_at = ? WHERE meeting_id = ?")
-    .bind(title, now(), meetingId)
+/** Returns false (no-op) if meetingId doesn't exist or isn't owned by
+ * teamId - the team check is enforced right in the WHERE clause. */
+export async function updateMeetingTitle(
+  db: D1Database,
+  meetingId: string,
+  teamId: string,
+  title: string,
+): Promise<boolean> {
+  const result = await db
+    .prepare("UPDATE meeting SET title = ?, updated_at = ? WHERE meeting_id = ? AND team_id = ?")
+    .bind(title, now(), meetingId, teamId)
     .run();
+  return result.meta.changes > 0;
 }

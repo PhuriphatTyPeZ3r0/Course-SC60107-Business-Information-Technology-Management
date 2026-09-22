@@ -1,5 +1,6 @@
 import * as db from "./db";
 import { runMeetingPipeline } from "./pipeline";
+import { signSessionToken, verifySessionToken } from "./auth";
 import type { ActionItemStatus, Env } from "./types";
 
 // Matches Whisper_Backend_API's Process/Service.py persistence-backed API
@@ -7,11 +8,10 @@ import type { ActionItemStatus, Env } from "./types";
 // are the same contract, so whisper-frontend needs zero changes, only
 // NEXT_PUBLIC_API_BASE_URL pointed at this Worker's URL.
 //
-// Auth here is intentionally minimal, same as the local backend: real user
-// rows with a real PBKDF2 hash (src/auth.ts), but /api/auth/login only
-// looks the account up by email and never verifies the password. The
-// frontend doesn't send its token back on later requests either, so
-// there's no bearer-token verification to implement here.
+// Auth: Google OAuth2 only (see DESIGN_SYSTEM.md's "Real authentication"
+// section) - every route except /health and the callback itself requires a
+// valid `Authorization: Bearer <token>`, verified via requireAuth() below.
+// userId/teamId come from the token, not a hardcoded demo account.
 //
 // No framework (Hono etc.) on purpose: keeping the bundle to just this
 // project's own code - no bundled dependency tree - matters for how it's
@@ -33,15 +33,7 @@ function errorJson(code: string, message: string, status: number, corsOrigin?: s
   return json({ error: { code, message } }, status, corsOrigin);
 }
 
-interface LoginBody {
-  email?: string;
-  password?: string;
-}
-interface SignupBody extends LoginBody {
-  displayName?: string;
-}
 interface ActionItemPatchBody {
-  meetingId?: string;
   status?: string;
   description?: string;
   assigneeName?: string | null;
@@ -64,44 +56,121 @@ async function readJson<T>(request: Request): Promise<T> {
   }
 }
 
-async function handleLogin(request: Request, env: Env, origin: string): Promise<Response> {
-  const body = await readJson<LoginBody>(request);
-  if (!body.email) return errorJson("INVALID_REQUEST", "Email is required", 400, origin);
-
-  const user = await db.getUserByEmail(env.DB, body.email);
-  if (!user) return errorJson("INVALID_CREDENTIALS", "Invalid email or password", 401, origin);
-  return json({ token: crypto.randomUUID(), user }, 200, origin);
+interface Auth {
+  userId: string;
+  teamId: string;
 }
 
-async function handleSignup(request: Request, env: Env, origin: string): Promise<Response> {
-  const body = await readJson<SignupBody>(request);
-  if (!body.email || !body.password || !body.displayName) {
-    return errorJson("INVALID_REQUEST", "Email, password, and display name are required", 400, origin);
+async function requireAuth(request: Request, env: Env): Promise<Auth | null> {
+  const header = request.headers.get("Authorization");
+  if (!header?.startsWith("Bearer ")) return null;
+  return verifySessionToken(header.slice("Bearer ".length), env.AUTH_SECRET);
+}
+
+// --- Google OAuth2 ---------------------------------------------------------
+
+interface GoogleTokenResponse {
+  id_token?: string;
+  error?: string;
+  error_description?: string;
+}
+
+interface GoogleIdTokenPayload {
+  sub: string;
+  email?: string;
+  email_verified?: boolean;
+  name?: string;
+}
+
+/** No JWKS signature check - this id_token came from a direct
+ * server-to-server HTTPS call to Google's own token endpoint (not handed to
+ * us by the browser), so decoding the payload without also verifying its
+ * signature is an accepted scope cut for this project, not an oversight -
+ * see DESIGN_SYSTEM.md 5b-i. */
+function decodeGoogleIdToken(jwt: string): GoogleIdTokenPayload {
+  const parts = jwt.split(".");
+  if (parts.length !== 3) throw new Error("Malformed id_token");
+  const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (parts[1].length % 4)) % 4);
+  return JSON.parse(atob(b64));
+}
+
+function base64UrlEncodeJson(value: unknown): string {
+  const bytes = new TextEncoder().encode(JSON.stringify(value));
+  let binary = "";
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+/** GET /api/auth/google/callback?code=...&state=... - Google redirects
+ * here after the user consents. Exchanges the code for tokens (needs
+ * client_secret, so this must happen server-side - the frontend is a
+ * static export with nowhere to keep a secret), finds-or-creates the user
+ * and their personal team, then redirects to the frontend with the new
+ * session token in the URL fragment (never a query string, so it never
+ * hits server logs or Referer headers). `state` is checked for presence
+ * only, not cryptographically verified - matches the id_token scope cut
+ * above; see DESIGN_SYSTEM.md 5b-i for why a stateless Worker can't verify
+ * it any more strictly without an extra round trip. */
+async function handleGoogleCallback(request: Request, env: Env, origin: string): Promise<Response> {
+  const url = new URL(request.url);
+  const code = url.searchParams.get("code");
+  const state = url.searchParams.get("state");
+  if (!code || !state) return errorJson("INVALID_REQUEST", "Missing code or state", 400, origin);
+
+  const redirectUri = `${url.origin}/api/auth/google/callback`;
+  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      code,
+      client_id: env.GOOGLE_CLIENT_ID,
+      client_secret: env.GOOGLE_CLIENT_SECRET,
+      redirect_uri: redirectUri,
+      grant_type: "authorization_code",
+    }),
+  });
+  const tokenBody = await tokenRes.json<GoogleTokenResponse>();
+  if (!tokenRes.ok || !tokenBody.id_token) {
+    console.error("Google token exchange failed", tokenBody);
+    return errorJson("OAUTH_ERROR", tokenBody.error_description ?? "Google sign-in failed", 401, origin);
   }
 
+  let payload: GoogleIdTokenPayload;
   try {
-    const user = await db.createUserAccount(env.DB, body.email, body.password, body.displayName);
-    return json({ token: crypto.randomUUID(), user }, 200, origin);
-  } catch (err) {
-    if (err instanceof db.DuplicateEmailError) {
-      return errorJson("EMAIL_EXISTS", `Email already exists: ${body.email}`, 409, origin);
-    }
-    throw err;
+    payload = decodeGoogleIdToken(tokenBody.id_token);
+  } catch {
+    return errorJson("OAUTH_ERROR", "Could not read Google's response", 401, origin);
   }
+  if (!payload.email || payload.email_verified === false) {
+    return errorJson("OAUTH_ERROR", "Google account has no verified email", 401, origin);
+  }
+
+  const user = await db.findOrCreateGoogleUser(
+    env.DB,
+    { googleSub: payload.sub, email: payload.email, displayName: payload.name ?? payload.email },
+    { encryptionKey: env.PII_ENCRYPTION_KEY, hmacKey: env.PII_LOOKUP_HMAC_KEY },
+  );
+
+  const token = await signSessionToken(user.id, user.teamId, env.AUTH_SECRET);
+  const userBlob = base64UrlEncodeJson({ id: user.id, email: user.email, displayName: user.displayName });
+  const location = `${env.CORS_ORIGIN}/auth/callback#token=${encodeURIComponent(token)}&user=${encodeURIComponent(userBlob)}`;
+  return new Response(null, { status: 302, headers: { Location: location } });
 }
 
-async function handleListMeetings(env: Env, origin: string): Promise<Response> {
-  const meetings = await db.listTeamMeetings(env.DB);
+// --- Meetings / action items -----------------------------------------------
+
+async function handleListMeetings(auth: Auth, env: Env, origin: string): Promise<Response> {
+  const meetings = await db.listTeamMeetings(env.DB, auth.teamId);
   return json({ meetings }, 200, origin);
 }
 
-async function handleGetMeeting(meetingId: string, env: Env, origin: string): Promise<Response> {
-  const meeting = await db.getMeetingFull(env.DB, meetingId);
+async function handleGetMeeting(meetingId: string, auth: Auth, env: Env, origin: string): Promise<Response> {
+  const meeting = await db.getMeetingFull(env.DB, meetingId, auth.teamId);
   if (!meeting) return errorJson("NOT_FOUND", "Meeting not found", 404, origin);
   return json({ meeting }, 200, origin);
 }
 
-async function handleCreateMeeting(request: Request, env: Env, origin: string): Promise<Response> {
+async function handleCreateMeeting(request: Request, auth: Auth, env: Env, origin: string): Promise<Response> {
   const formData = await request.formData();
   const title = typeof formData.get("title") === "string" ? (formData.get("title") as string).trim() : "";
   const file = formData.get("file");
@@ -118,10 +187,7 @@ async function handleCreateMeeting(request: Request, env: Env, origin: string): 
   }
 
   const audio = await file.arrayBuffer();
-  const demoUser = await db.getUserByEmail(env.DB, db.DEMO_USER_EMAIL);
-  if (!demoUser) return errorJson("INTERNAL_ERROR", "Demo user not seeded", 500, origin);
-
-  const { meetingId, jobIds } = await db.createMeetingWithJobs(env.DB, demoUser.id, title, file.name);
+  const { meetingId, jobIds } = await db.createMeetingWithJobs(env.DB, auth.teamId, auth.userId, title, file.name);
 
   // Deliberately awaited, not fire-and-forget via waitUntil(): waitUntil only
   // buys ~30s of extra runtime after the response is sent, nowhere near
@@ -133,17 +199,24 @@ async function handleCreateMeeting(request: Request, env: Env, origin: string): 
   // lifetime, planned as the next slice for longer recordings.
   await runMeetingPipeline(env, meetingId, jobIds, audio);
 
-  const meeting = await db.getMeetingFull(env.DB, meetingId);
+  const meeting = await db.getMeetingFull(env.DB, meetingId, auth.teamId);
   return json({ meeting }, 201, origin);
 }
 
-async function handlePatchMeeting(meetingId: string, request: Request, env: Env, origin: string): Promise<Response> {
+async function handlePatchMeeting(
+  meetingId: string,
+  request: Request,
+  auth: Auth,
+  env: Env,
+  origin: string,
+): Promise<Response> {
   const body = await readJson<MeetingPatchBody>(request);
   const title = body.title?.trim();
   if (!title) return errorJson("INVALID_REQUEST", "Title is required", 400, origin);
 
-  await db.updateMeetingTitle(env.DB, meetingId, title);
-  const meeting = await db.getMeetingFull(env.DB, meetingId);
+  const updated = await db.updateMeetingTitle(env.DB, meetingId, auth.teamId, title);
+  if (!updated) return errorJson("NOT_FOUND", "Meeting not found", 404, origin);
+  const meeting = await db.getMeetingFull(env.DB, meetingId, auth.teamId);
   if (!meeting) return errorJson("NOT_FOUND", "Meeting not found", 404, origin);
   return json({ meeting }, 200, origin);
 }
@@ -151,6 +224,7 @@ async function handlePatchMeeting(meetingId: string, request: Request, env: Env,
 async function handleCreateActionItem(
   meetingId: string,
   request: Request,
+  auth: Auth,
   env: Env,
   origin: string,
 ): Promise<Response> {
@@ -158,10 +232,10 @@ async function handleCreateActionItem(
   const description = body.description?.trim();
   if (!description) return errorJson("INVALID_REQUEST", "Description is required", 400, origin);
 
-  const meeting = await db.getMeetingFull(env.DB, meetingId);
+  const meeting = await db.getMeetingFull(env.DB, meetingId, auth.teamId);
   if (!meeting) return errorJson("NOT_FOUND", "Meeting not found", 404, origin);
 
-  const actionItem = await db.createActionItem(env.DB, meetingId, {
+  const actionItem = await db.createActionItem(env.DB, meetingId, auth.teamId, {
     description,
     assigneeName: body.assigneeName?.trim() || null,
     dueDate: body.dueDate || null,
@@ -169,7 +243,13 @@ async function handleCreateActionItem(
   return json({ actionItem }, 201, origin);
 }
 
-async function handlePatchActionItem(actionItemId: string, request: Request, env: Env, origin: string): Promise<Response> {
+async function handlePatchActionItem(
+  actionItemId: string,
+  request: Request,
+  auth: Auth,
+  env: Env,
+  origin: string,
+): Promise<Response> {
   const body = await readJson<ActionItemPatchBody>(request);
   if (body.status !== undefined && !VALID_ACTION_ITEM_STATUSES.includes(body.status as ActionItemStatus)) {
     return errorJson("INVALID_STATUS", `Invalid status: ${body.status}`, 400, origin);
@@ -183,7 +263,7 @@ async function handlePatchActionItem(actionItemId: string, request: Request, env
     return errorJson("INVALID_REQUEST", "No fields to update", 400, origin);
   }
 
-  const actionItem = await db.updateActionItem(env.DB, actionItemId, {
+  const actionItem = await db.updateActionItem(env.DB, actionItemId, auth.teamId, {
     description: body.description?.trim(),
     assigneeName: body.assigneeName === undefined ? undefined : body.assigneeName?.trim() || null,
     dueDate: body.dueDate,
@@ -202,12 +282,10 @@ export default {
         headers: {
           "Access-Control-Allow-Origin": origin,
           "Access-Control-Allow-Methods": "GET, POST, PATCH, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type",
+          "Access-Control-Allow-Headers": "Content-Type, Authorization",
         },
       });
     }
-
-    await db.ensureDemoSeed(env.DB);
 
     const url = new URL(request.url);
     const { pathname } = url;
@@ -215,23 +293,28 @@ export default {
 
     try {
       if (method === "GET" && pathname === "/health") return json({ status: "ok" }, 200, origin);
-      if (method === "POST" && pathname === "/api/auth/login") return await handleLogin(request, env, origin);
-      if (method === "POST" && pathname === "/api/auth/signup") return await handleSignup(request, env, origin);
-      if (method === "GET" && pathname === "/api/meetings") return await handleListMeetings(env, origin);
-      if (method === "POST" && pathname === "/api/meetings") return await handleCreateMeeting(request, env, origin);
+      if (method === "GET" && pathname === "/api/auth/google/callback") {
+        return await handleGoogleCallback(request, env, origin);
+      }
+
+      const auth = await requireAuth(request, env);
+      if (!auth) return errorJson("UNAUTHORIZED", "Missing or invalid session", 401, origin);
+
+      if (method === "GET" && pathname === "/api/meetings") return await handleListMeetings(auth, env, origin);
+      if (method === "POST" && pathname === "/api/meetings") return await handleCreateMeeting(request, auth, env, origin);
 
       const meetingMatch = pathname.match(/^\/api\/meetings\/([^/]+)$/);
-      if (method === "GET" && meetingMatch) return await handleGetMeeting(meetingMatch[1], env, origin);
-      if (method === "PATCH" && meetingMatch) return await handlePatchMeeting(meetingMatch[1], request, env, origin);
+      if (method === "GET" && meetingMatch) return await handleGetMeeting(meetingMatch[1], auth, env, origin);
+      if (method === "PATCH" && meetingMatch) return await handlePatchMeeting(meetingMatch[1], request, auth, env, origin);
 
       const meetingActionItemsMatch = pathname.match(/^\/api\/meetings\/([^/]+)\/action-items$/);
       if (method === "POST" && meetingActionItemsMatch) {
-        return await handleCreateActionItem(meetingActionItemsMatch[1], request, env, origin);
+        return await handleCreateActionItem(meetingActionItemsMatch[1], request, auth, env, origin);
       }
 
       const actionItemMatch = pathname.match(/^\/api\/action-items\/([^/]+)$/);
       if (method === "PATCH" && actionItemMatch) {
-        return await handlePatchActionItem(actionItemMatch[1], request, env, origin);
+        return await handlePatchActionItem(actionItemMatch[1], request, auth, env, origin);
       }
 
       return errorJson("NOT_FOUND", "No such route", 404, origin);

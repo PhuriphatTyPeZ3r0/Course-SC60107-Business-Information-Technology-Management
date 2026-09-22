@@ -88,4 +88,12 @@ export interface Env {
   // and isn't used by the pipeline yet anyway. See wrangler.jsonc.
   AI: Ai;
   CORS_ORIGIN: string;
+  // Google OAuth2 (see DESIGN_SYSTEM.md's "Real authentication" section).
+  // Client ID is not secret (it's embedded in the frontend bundle too);
+  // the rest are `wrangler secret put`.
+  GOOGLE_CLIENT_ID: string;
+  GOOGLE_CLIENT_SECRET: string;
+  AUTH_SECRET: string;
+  PII_ENCRYPTION_KEY: string;
+  PII_LOOKUP_HMAC_KEY: string;
 }

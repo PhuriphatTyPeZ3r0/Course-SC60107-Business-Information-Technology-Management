@@ -24,6 +24,10 @@
 
   "vars": {
     // Frontend origin allowed to call this API cross-origin.
-    "CORS_ORIGIN": "https://whisper-web.whisper-ai.workers.dev"
+    "CORS_ORIGIN": "https://whisper-web.whisper-ai.workers.dev",
+    // Not secret - Client IDs are embedded in the frontend bundle too.
+    // GOOGLE_CLIENT_SECRET, AUTH_SECRET, PII_ENCRYPTION_KEY, and
+    // PII_LOOKUP_HMAC_KEY are `wrangler secret put`, not here.
+    "GOOGLE_CLIENT_ID": "737639598890-3r5gtcebdhn2je2uq5rtld2lj86oc323.apps.googleusercontent.com"
   }
 }
