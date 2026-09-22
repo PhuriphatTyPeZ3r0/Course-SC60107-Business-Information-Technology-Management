@@ -6,39 +6,39 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Icon } from "@/components/icon";
 import { useLanguage } from "@/lib/i18n/context";
 import { useAuth } from "@/lib/auth/context";
 import { useMounted } from "@/lib/hooks/use-mounted";
+import { api } from "@/lib/api/client";
+
+// Real Google sign-in needs a redirect_uri Google Cloud Console has
+// registered - only the deployed Worker's URL is registered (see
+// DESIGN_SYSTEM.md 5b-iv), so it can't work against localhost. The mock
+// backend (no NEXT_PUBLIC_API_BASE_URL) short-circuits to an instant local
+// session instead - see api.mockGoogleSignIn().
+const IS_MOCK_BACKEND = !process.env.NEXT_PUBLIC_API_BASE_URL;
 
 export default function LoginPage() {
   const { t } = useLanguage();
-  const { login, signup } = useAuth();
+  const { setSession } = useAuth();
   const router = useRouter();
   const mounted = useMounted();
-
-  const [mode, setMode] = useState<"login" | "signup">("login");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [displayName, setDisplayName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleGoogleSignIn() {
+    if (!IS_MOCK_BACKEND) {
+      window.location.href = api.googleSignInUrl();
+      return;
+    }
     setIsSubmitting(true);
     try {
-      if (mode === "login") {
-        await login(email, password);
-      } else {
-        await signup(email, password, displayName);
-      }
+      const result = await api.mockGoogleSignIn();
+      setSession(result);
       router.push("/dashboard");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
       setIsSubmitting(false);
     }
   }
@@ -60,61 +60,19 @@ export default function LoginPage() {
         </Link>
         <Card className="glass-panel">
           <CardHeader>
-            <CardTitle>{mode === "login" ? t.auth.loginTitle : t.auth.signupTitle}</CardTitle>
+            <CardTitle>{t.auth.loginTitle}</CardTitle>
+            <p className="text-sm text-muted-foreground">{t.auth.loginSubtitle}</p>
           </CardHeader>
           <CardContent>
-            <Tabs value={mode} onValueChange={(v) => setMode(v as "login" | "signup")}>
-              <TabsList className="mb-4 w-full">
-                <TabsTrigger value="login" className="flex-1">
-                  {t.auth.loginTitle}
-                </TabsTrigger>
-                <TabsTrigger value="signup" className="flex-1">
-                  {t.auth.signupTitle}
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value={mode} className="mt-0">
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  {mode === "signup" && (
-                    <div className="space-y-1.5">
-                      <Label htmlFor="displayName">{t.auth.displayName}</Label>
-                      <Input
-                        id="displayName"
-                        value={displayName}
-                        onChange={(e) => setDisplayName(e.target.value)}
-                        required
-                      />
-                    </div>
-                  )}
-                  <div className="space-y-1.5">
-                    <Label htmlFor="email">{t.auth.email}</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="password">{t.auth.password}</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={isSubmitting}>
-                    {mode === "login" ? t.auth.loginSubmit : t.auth.signupSubmit}
-                  </Button>
-                </form>
-              </TabsContent>
-            </Tabs>
-            <p className="mt-4 text-center text-xs text-muted-foreground">
-              {t.auth.mockNotice}
-            </p>
+            <Button
+              type="button"
+              className="w-full"
+              disabled={isSubmitting}
+              onClick={handleGoogleSignIn}
+            >
+              <Icon name="login" className="mr-2 text-[18px]" />
+              {t.auth.googleSignIn}
+            </Button>
           </CardContent>
         </Card>
       </motion.div>

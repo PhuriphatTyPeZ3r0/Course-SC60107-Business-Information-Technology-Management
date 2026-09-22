@@ -1,11 +1,9 @@
 "use client";
 
 import { createContext, useContext, useMemo } from "react";
-import { api, type AuthedUser } from "@/lib/api/client";
+import { SESSION_STORAGE_KEY, type AuthedUser } from "@/lib/api/client";
 import { useLocalStorageRaw, writeLocalStorage } from "@/lib/hooks/use-local-storage";
 import { useMounted } from "@/lib/hooks/use-mounted";
-
-const STORAGE_KEY = "whisper.session";
 
 interface Session {
   token: string;
@@ -15,8 +13,9 @@ interface Session {
 interface AuthContextValue {
   session: Session | null;
   isHydrated: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string, displayName: string) => Promise<void>;
+  /** Called by /auth/callback once it's parsed the token+user out of the
+   * Google redirect's URL fragment - see DESIGN_SYSTEM.md 5b-i. */
+  setSession: (session: Session) => void;
   logout: () => void;
 }
 
@@ -43,7 +42,7 @@ function parseSession(raw: string | null): Session | null {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const raw = useLocalStorageRaw(STORAGE_KEY);
+  const raw = useLocalStorageRaw(SESSION_STORAGE_KEY);
   const isHydrated = useMounted();
   const session = parseSession(raw);
 
@@ -51,15 +50,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     () => ({
       session,
       isHydrated,
-      login: async (email, password) => {
-        const result = await api.login(email, password);
-        writeLocalStorage(STORAGE_KEY, JSON.stringify(result));
-      },
-      signup: async (email, password, displayName) => {
-        const result = await api.signup(email, password, displayName);
-        writeLocalStorage(STORAGE_KEY, JSON.stringify(result));
-      },
-      logout: () => writeLocalStorage(STORAGE_KEY, null),
+      setSession: (next) => writeLocalStorage(SESSION_STORAGE_KEY, JSON.stringify(next)),
+      logout: () => writeLocalStorage(SESSION_STORAGE_KEY, null),
     }),
     [session, isHydrated],
   );
