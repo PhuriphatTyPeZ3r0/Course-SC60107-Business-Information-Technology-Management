@@ -155,9 +155,18 @@ Completed via Chrome automation on the existing `Whisper-PJ-API` Google Cloud pr
    - Authorized redirect URI: `https://whisper-api.whisper-ai.workers.dev/api/auth/google/callback`
    - **Client ID** (safe to share): `737639598890-3r5gtcebdhn2je2uq5rtld2lj86oc323.apps.googleusercontent.com`
    - **Client Secret**: copied directly by the user from the Cloud Console dialog, never seen by Claude. Still needs `wrangler secret put GOOGLE_CLIENT_SECRET` run by the user before implementation.
-4. ~~`PII_ENCRYPTION_KEY` / `PII_LOOKUP_HMAC_KEY`~~ — generated locally via `openssl rand -base64 32`. **Not yet set as Worker secrets** — Claude Code's auto-mode classifier blocks secret-store writes; the user needs to run the two `wrangler secret put` commands themselves (values were echoed once in that session's terminal output).
+4. ~~`PII_ENCRYPTION_KEY` / `PII_LOOKUP_HMAC_KEY` / `AUTH_SECRET`~~ — generated locally via `openssl rand -base64 32` (`AUTH_SECRET` wasn't in the original checklist - it signs the session token, carried over unchanged from the pre-Google design, and was easy to miss until implementation started). **Not yet set as Worker secrets** — Claude Code's auto-mode classifier blocks secret-store writes; the user needs to run the `wrangler secret put` commands themselves (values were echoed once in that session's terminal output).
 
-**Still blocking before implementation can start:** the two `wrangler secret put` calls above (`GOOGLE_CLIENT_SECRET`, `PII_ENCRYPTION_KEY`, `PII_LOOKUP_HMAC_KEY` — three secrets total, none set yet).
+**Implementation is done** (both backend and frontend - see below), committed on `feature/google-sso-encryption`, fully typechecked, built, and verified locally against the mock backend (sign-in, dashboard, logout, 401-redirect). **Not deployed and not merged to main** - doing either now would break the currently-working login for real users, since the new code can't actually sign anyone in without the four secrets below set first:
+
+```
+npx wrangler secret put GOOGLE_CLIENT_SECRET
+npx wrangler secret put AUTH_SECRET
+npx wrangler secret put PII_ENCRYPTION_KEY
+npx wrangler secret put PII_LOOKUP_HMAC_KEY
+```
+
+Run these (in `Whisper_Cloudflare_API`), then say the word and this gets deployed, live-verified with a real Google sign-in, and merged.
 
 **Frontend:**
 - Replace `login/page.tsx`'s email/password form with a single "Sign in with Google" button.
@@ -177,26 +186,29 @@ Completed via Chrome automation on the existing `Whisper-PJ-API` Google Cloud pr
 
 ## 6. Sub-task checklist
 
-### Now (this pass)
-- [ ] Typography: swap Geist → Prompt (`thai`+`latin`, weights 300-700) in `layout.tsx`; drop unused Geist Mono
-- [ ] Icons: add Material Symbols Rounded stylesheet + `<Icon>` wrapper component; map all 13 lucide call sites 1:1; remove `lucide-react` dependency once done
-- [ ] Liquid Glass: rewrite `.glass-panel` (specular `::before`, inset shadows, hover/focus tint transition); add `src/lib/motion.ts` shared spring preset; apply to nav headers + existing glass surfaces
-- [ ] Backend: `POST /api/meetings/{id}/action-items`, extend `PATCH /api/action-items/{id}` to accept description/assignee/dueDate
-- [ ] Backend: `PATCH /api/meetings/{id}` for title rename
-- [ ] Frontend: action item create/edit form in `action-item-list.tsx`
-- [ ] Frontend: click-to-edit meeting title in `dashboard/meeting/page.tsx`
-- [ ] Deploy Worker + frontend, verify live (same pattern as the diarization-fallback fix: synthetic/real test, check both `POST`/`PATCH` responses and the rendered UI)
+### Done (deployed to production, 2026-09-22)
+- [x] Typography: swap Geist → Prompt (`thai`+`latin`, weights 300-700) in `layout.tsx`; drop unused Geist Mono
+- [x] Icons: add Material Symbols Rounded stylesheet + `<Icon>` wrapper component; map all 13 lucide call sites 1:1; remove `lucide-react` dependency
+- [x] Liquid Glass: rewrite `.glass-panel` (specular `::before`, inset shadows, hover/focus tint transition); add `src/lib/motion.ts` shared spring preset; applied to nav headers + existing glass surfaces
+- [x] Backend: `POST /api/meetings/{id}/action-items`, extended `PATCH /api/action-items/{id}` to accept description/assignee/dueDate
+- [x] Backend: `PATCH /api/meetings/{id}` for title rename
+- [x] Frontend: action item create/edit form in `action-item-list.tsx`
+- [x] Frontend: click-to-edit meeting title in `dashboard/meeting/page.tsx`
+- [x] Deployed and verified live
 
-### Later (designed above, implement directly from §5 when picked back up)
+### In progress - code done, not deployed (§5b: Google SSO, per-user isolation, PII encryption)
+- [x] Google Cloud OAuth setup (§5b-iv) — consent screen, published to Production, OAuth client created, `/privacy` page live
+- [x] Migration `0004`: `email_encrypted`/`email_lookup_hash`/`display_name_encrypted`/`google_sub` on `user_account` — **applied to the live D1 database already** (additive, safe ahead of the code deploy)
+- [x] Backend: `GET /api/auth/google/callback`, `findOrCreateGoogleUser()` + personal-team auto-creation, `Authorization: Bearer` verification on every other route, team-scoped WHERE clauses on every meeting/action-item read and write (not just at login - a guessed ID from another team 404s)
+- [x] Backend: AES-256-GCM + HMAC blind-index helpers in `auth.ts`
+- [x] Frontend: "Sign in with Google" button, new `/auth/callback` route, dead password-auth code and the "Demo mode" notice removed
+- [x] Typechecked, built, and verified locally against the mock backend (sign-in/dashboard/logout/401-redirect)
+- [ ] **You**: set the four Worker secrets (`GOOGLE_CLIENT_SECRET`, `AUTH_SECRET`, `PII_ENCRYPTION_KEY`, `PII_LOOKUP_HMAC_KEY` — commands above) — blocks the two items below
+- [ ] Deploy Worker + frontend, verify live with a real Google sign-in
+- [ ] Merge `feature/google-sso-encryption` to `main`
+
+### Later
 - [ ] Soft delete: `DELETE`/`restore` endpoints, Trash view, confirm-dialog on delete
-- [x] Google Cloud OAuth setup (§5b-iv) — consent screen, published to Production, OAuth client created
-- [ ] **You**: `wrangler secret put GOOGLE_CLIENT_SECRET` / `PII_ENCRYPTION_KEY` / `PII_LOOKUP_HMAC_KEY` (three secrets, none set yet) — blocks everything below
-- [ ] Migration: `email_encrypted`, `email_lookup_hash`, `display_name_encrypted`, `google_sub` columns on `user_account`
-- [ ] Backend: `GET /api/auth/google/callback` (code exchange, find-or-create user, personal-team auto-creation, issue session token)
-- [ ] Backend: AES-256-GCM encrypt/decrypt + HMAC lookup-hash helpers in `auth.ts`; wire every `user_account` read/write through them
-- [ ] Backend: replace every `getDemoTeamId()` call with the authenticated request's own team
-- [ ] Backend: `Authorization: Bearer <token>` verification on every route except `/health` and the OAuth routes
-- [ ] Frontend: "Sign in with Google" button replacing the password form; new `/auth/callback` route; remove dead password-auth code and the "Demo mode" notice
 - [ ] R2 upload storage (prerequisite for...)
 - [ ] Retry failed meeting
 - [ ] Search: D1 FTS5 migration + query endpoint + search box
