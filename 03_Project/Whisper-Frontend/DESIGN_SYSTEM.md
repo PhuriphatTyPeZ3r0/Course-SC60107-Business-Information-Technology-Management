@@ -144,13 +144,20 @@ New columns on `user_account` (migration, additive — no data loss for existing
 - Two new Worker secrets: `PII_ENCRYPTION_KEY` (AES-256-GCM key) and `PII_LOOKUP_HMAC_KEY` (separate from both the encryption key and the existing session-token-signing secret — distinct keys per purpose is the point).
 - Every read of `user_account` that needs to *display* email/name decrypts at read time; every read that needs to *find* a user by email computes the lookup hash from the input and queries that column instead.
 
-#### 5b-iv. Manual setup checklist (you, not Claude — needs your Google account in a browser)
+#### 5b-iv. Manual setup checklist — DONE (2026-09-22)
 
-1. Google Cloud Console → new project (or reuse an existing one) → **APIs & Services → OAuth consent screen** → configure it (app name, support email, scopes: `openid`, `email`, `profile`).
-2. **APIs & Services → Credentials → Create Credentials → OAuth client ID**, application type "Web application".
-3. Authorized redirect URI: `https://whisper-api.whisper-ai.workers.dev/api/auth/google/callback` (exact match required, including scheme/host/path).
-4. Copy the **Client ID** (safe to share, goes in frontend code / `wrangler.jsonc` `vars`) and **Client Secret** (never share — set directly with `wrangler secret put GOOGLE_CLIENT_SECRET` when this is implemented).
-5. While in Cloud Console, also generate two random 32-byte secrets for `PII_ENCRYPTION_KEY` and `PII_LOOKUP_HMAC_KEY` (e.g. `openssl rand -base64 32` locally — not a Google Cloud step, just do it at the same time) and set them the same way.
+Completed via Chrome automation on the existing `Whisper-PJ-API` Google Cloud project (`whisper-pj-api`, org `phuriphathem-org`) — this project already existed but had stale "Japanese-Coach" branding left over from another project, now corrected.
+
+1. ~~OAuth consent screen~~ — **done.** App name "Whisper", support email `phuriphathem@gmail.com`, scopes `openid`/`email`/`profile`. Also required (discovered mid-setup, not anticipated in the original design): a homepage URL and a public privacy policy URL. Added `/privacy` as a real route on `whisper-frontend` (`src/app/privacy/page.tsx`, bilingual, honest about current vs. planned data practices — deployed and live) and set both URLs to `whisper-web.whisper-ai.workers.dev`.
+2. ~~Publishing status~~ — **Published to Production** (not left in Testing). Confirmed no verification is required since the app requests only non-sensitive scopes and has ≤10 domains and no logo. Any Google account can sign in once this ships, not just pre-approved test users.
+3. ~~OAuth client~~ — **created.** Name "Whisper Web", type "Web application".
+   - Authorized JavaScript origin: `https://whisper-web.whisper-ai.workers.dev`
+   - Authorized redirect URI: `https://whisper-api.whisper-ai.workers.dev/api/auth/google/callback`
+   - **Client ID** (safe to share): `737639598890-3r5gtcebdhn2je2uq5rtld2lj86oc323.apps.googleusercontent.com`
+   - **Client Secret**: copied directly by the user from the Cloud Console dialog, never seen by Claude. Still needs `wrangler secret put GOOGLE_CLIENT_SECRET` run by the user before implementation.
+4. ~~`PII_ENCRYPTION_KEY` / `PII_LOOKUP_HMAC_KEY`~~ — generated locally via `openssl rand -base64 32`. **Not yet set as Worker secrets** — Claude Code's auto-mode classifier blocks secret-store writes; the user needs to run the two `wrangler secret put` commands themselves (values were echoed once in that session's terminal output).
+
+**Still blocking before implementation can start:** the two `wrangler secret put` calls above (`GOOGLE_CLIENT_SECRET`, `PII_ENCRYPTION_KEY`, `PII_LOOKUP_HMAC_KEY` — three secrets total, none set yet).
 
 **Frontend:**
 - Replace `login/page.tsx`'s email/password form with a single "Sign in with Google" button.
@@ -182,7 +189,8 @@ New columns on `user_account` (migration, additive — no data loss for existing
 
 ### Later (designed above, implement directly from §5 when picked back up)
 - [ ] Soft delete: `DELETE`/`restore` endpoints, Trash view, confirm-dialog on delete
-- [ ] **You**: complete the Google Cloud OAuth setup checklist (§5b-iv) — blocks everything below
+- [x] Google Cloud OAuth setup (§5b-iv) — consent screen, published to Production, OAuth client created
+- [ ] **You**: `wrangler secret put GOOGLE_CLIENT_SECRET` / `PII_ENCRYPTION_KEY` / `PII_LOOKUP_HMAC_KEY` (three secrets, none set yet) — blocks everything below
 - [ ] Migration: `email_encrypted`, `email_lookup_hash`, `display_name_encrypted`, `google_sub` columns on `user_account`
 - [ ] Backend: `GET /api/auth/google/callback` (code exchange, find-or-create user, personal-team auto-creation, issue session token)
 - [ ] Backend: AES-256-GCM encrypt/decrypt + HMAC lookup-hash helpers in `auth.ts`; wire every `user_account` read/write through them
