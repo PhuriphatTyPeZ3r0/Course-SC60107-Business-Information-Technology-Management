@@ -87,6 +87,20 @@ export const dictionaries = {
       renameMeetingLabel: "แก้ไขชื่อการประชุม",
     },
     common: { back: "ย้อนกลับ", save: "บันทึก", cancel: "ยกเลิก" },
+    privacy: {
+      title: "นโยบายความเป็นส่วนตัว",
+      updated: "ปรับปรุงล่าสุด: 22 กันยายน 2569",
+      intro:
+        "Whisper เป็นโปรเจกต์ของนักศึกษาสำหรับวิชา Business IT Management ไม่ใช่ผลิตภัณฑ์เชิงพาณิชย์ หน้านี้อธิบายว่าเราเก็บและใช้ข้อมูลอะไรบ้าง",
+      dataTitle: "ข้อมูลที่เราเก็บ",
+      dataBody:
+        "เมื่อคุณเข้าสู่ระบบด้วย Google เราเก็บอีเมลและชื่อที่แสดงจากบัญชี Google ของคุณ เพื่อระบุตัวตนและแยกข้อมูลของแต่ละคน เมื่อคุณอัปโหลดไฟล์เสียงประชุม เราประมวลผลไฟล์นั้นเพื่อถอดเสียง แยกผู้พูด และสรุปเนื้อหา แล้วเก็บผลลัพธ์ (บทถอดเสียง สรุป รายการงาน) ไว้ในบัญชีของคุณ",
+      useTitle: "การใช้ข้อมูล",
+      useBody:
+        "ข้อมูลของคุณใช้เพื่อให้บริการฟีเจอร์ของแอปนี้เท่านั้น เราไม่ขายหรือแชร์ข้อมูลให้บุคคลภายนอกเพื่อการตลาด การประมวลผลเสียง/AI เกิดขึ้นผ่าน Cloudflare Workers AI ซึ่งเป็นผู้ให้บริการโครงสร้างพื้นฐานที่เราใช้",
+      contactTitle: "ติดต่อ",
+      contactBody: "มีคำถามเกี่ยวกับข้อมูลของคุณ ติดต่อ phuriphathem@gmail.com",
+    },
   },
   en: {
     brand: "Whisper",
@@ -174,6 +188,20 @@ export const dictionaries = {
       renameMeetingLabel: "Rename meeting",
     },
     common: { back: "Back", save: "Save", cancel: "Cancel" },
+    privacy: {
+      title: "Privacy Policy",
+      updated: "Last updated: September 22, 2026",
+      intro:
+        "Whisper is a student project for a Business IT Management course, not a commercial product. This page explains what data we collect and how it's used.",
+      dataTitle: "What we collect",
+      dataBody:
+        "When you sign in with Google, we store your email and display name from your Google account (encrypted with AES-256 before storage) to identify you and keep each person's data separate. When you upload a meeting recording, we process it to transcribe, separate speakers, and summarize the content, then store the results (transcript, summary, action items) in your account.",
+      useTitle: "How we use it",
+      useBody:
+        "Your data is used only to provide this app's features. We don't sell or share it with third parties for marketing. Audio/AI processing runs through Cloudflare Workers AI, the infrastructure provider we use.",
+      contactTitle: "Contact",
+      contactBody: "Questions about your data? Contact phuriphathem@gmail.com",
+    },
   },
 } as const;
 
