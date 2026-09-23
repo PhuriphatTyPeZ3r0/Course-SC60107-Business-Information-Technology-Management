@@ -67,6 +67,18 @@ no other frontend code changes needed.
   `/summarize` endpoints already use (mono uses `transcribe_with_chars` +
   `build_mono_diarized_transcript`, matching `/diarize`'s own mono path) —
   nothing about those three endpoints changed.
+- **Auto-split for oversized/overlong uploads**: unlike `/transcribe`,
+  `/diarize`, `/summarize` (which still reject with `413 FILE_TOO_LARGE`/
+  `413 AUDIO_TOO_LONG`), `POST /api/meetings` accepts uploads up to
+  `meeting_upload_hard_cap_mb` (250MB by default) and, if the file exceeds
+  `max_duration_sec`/`max_file_size_mb`, splits it into silence-aligned
+  chunks (`Process/audio_split.py`) before transcribing, then stitches the
+  chunks back into one continuous transcript — the frontend sees a normal
+  single transcript either way. Mono diarization still runs once on the
+  original, unsplit file (no duration cap of its own) so speaker identity
+  stays consistent across the whole recording. The returned transcript gains
+  two informational fields, `chunked: boolean` and `chunkCount: number`
+  (1 when no split was needed) — safe for the frontend to ignore.
 - **CORS**: `CORSMiddleware` added, origin from `CORS_ORIGIN` env var
   (defaults to `http://localhost:3000`).
 - **Schema change**: added `tbl_meeting.source_file_name VARCHAR(255)` —

@@ -15,6 +15,13 @@ from pydantic import BaseModel
 
 from Process import db
 from Process.audio_channels import probe_channel_count, split_stereo_channels
+from Process.audio_split import (
+    compute_cut_points,
+    compute_target_chunk_sec,
+    cut_audio_segments,
+    merge_transcript_chunks,
+    probe_duration_and_size,
+)
 from Process.diarization_pipeline import LazyDiarizationPipeline
 from Process.diarize import build_mono_diarized_transcript, merge_channel_transcripts
 from Process.errors import (
@@ -373,7 +380,12 @@ async def create_meeting(
     try:
         _ensure_ready()
         ext = _validate_extension(file.filename)
-        tmp_path = await _save_upload_to_tmp(file, ext, config.get("max_file_size_mb", 25) * 1024 * 1024)
+        # Uses the higher meeting_upload_hard_cap_mb, not max_file_size_mb:
+        # oversized/overlong uploads here get split (Process/audio_split.py)
+        # instead of rejected outright - see _run_meeting_pipeline.
+        tmp_path = await _save_upload_to_tmp(
+            file, ext, config.get("meeting_upload_hard_cap_mb", 250) * 1024 * 1024
+        )
 
         # Every meeting is attributed to the single seeded demo user,
         # regardless of who's "logged in" on the frontend - it never sends
@@ -403,6 +415,50 @@ async def patch_action_item(action_item_id: str, body: ActionItemStatusRequest):
     return {"actionItem": action_item}
 
 
+async def _transcribe_stereo_chunked(cut_points: list[float], chunk_paths: list[str], timeout: float) -> tuple[dict, dict]:
+    """Splits each already-cut stereo chunk into L/R and transcribes both
+    channels of every chunk in turn (still one call at a time through `gate`),
+    then stitches each channel's own chunks back into one continuous
+    transcript. No per-chunk max_duration_sec: chunk sizing already accounted
+    for the cap, and a chunk allowed to run long (no nearby silence, see
+    audio_split.compute_cut_points) shouldn't be re-rejected for it."""
+    channel_a_chunks, channel_b_chunks = [], []
+    for chunk_path in chunk_paths:
+        left_fd, left_path = tempfile.mkstemp(suffix=".wav")
+        right_fd, right_path = tempfile.mkstemp(suffix=".wav")
+        os.close(left_fd)
+        os.close(right_fd)
+        try:
+            await asyncio.to_thread(split_stereo_channels, chunk_path, left_path, right_path)
+            async with gate:
+                channel_a_chunks.append(
+                    await _run_with_timeout(pipeline.transcribe_text_only, left_path, None, timeout=timeout)
+                )
+                channel_b_chunks.append(
+                    await _run_with_timeout(pipeline.transcribe_text_only, right_path, None, timeout=timeout)
+                )
+        finally:
+            for p in (left_path, right_path):
+                if os.path.exists(p):
+                    os.remove(p)
+    return (
+        merge_transcript_chunks(channel_a_chunks, cut_points),
+        merge_transcript_chunks(channel_b_chunks, cut_points),
+    )
+
+
+async def _transcribe_mono_chunked(chunk_paths: list[str], cut_points: list[float], timeout: float) -> dict:
+    """Same no-per-chunk-cap reasoning as _transcribe_stereo_chunked, for the
+    mono/char-aligned transcript that diarization turns get mapped onto."""
+    chunk_transcripts = []
+    for chunk_path in chunk_paths:
+        async with gate:
+            chunk_transcripts.append(
+                await _run_with_timeout(pipeline.transcribe_with_chars, chunk_path, None, timeout=timeout)
+            )
+    return merge_transcript_chunks(chunk_transcripts, cut_points)
+
+
 async def _run_meeting_pipeline(meeting_id: str, job_ids: dict[str, str], tmp_path: str) -> None:
     """Runs transcribe -> diarize -> summarize for one uploaded meeting,
     updating each stage's tbl_job row as it progresses so the frontend's
@@ -410,52 +466,87 @@ async def _run_meeting_pipeline(meeting_id: str, job_ids: dict[str, str], tmp_pa
     Mirrors the /diarize route's stereo-split-vs-mono-speaker-model
     branching, but interleaved with per-stage DB updates instead of
     returning a single JSON response.
+
+    Audio over max_duration_sec/max_file_size_mb is split into
+    silence-aligned chunks (Process/audio_split.py) instead of rejected -
+    see meeting_upload_hard_cap_mb in config.yaml for the real reject-outright
+    ceiling. Diarization for mono files always runs on the original,
+    unsplit file: it has no duration cap of its own, and running it once
+    keeps a speaker's identity consistent across the whole recording instead
+    of each chunk re-clustering "who is speaker 0" from scratch.
     """
     try:
         _ensure_ready()
         max_duration_sec = config.get("max_duration_sec")
+        max_file_size_mb = config.get("max_file_size_mb", 25)
         timeout = config.get("request_timeout_sec", 300)
 
         await db.set_job_status(job_ids["transcribe"], "running")
         channels = await asyncio.to_thread(probe_channel_count, tmp_path)
+        if channels not in (1, 2):
+            raise UnsupportedChannelLayoutError(channels)
 
-        if channels == 2:
-            left_fd, left_path = tempfile.mkstemp(suffix=".wav")
-            right_fd, right_path = tempfile.mkstemp(suffix=".wav")
-            os.close(left_fd)
-            os.close(right_fd)
-            try:
-                await asyncio.to_thread(split_stereo_channels, tmp_path, left_path, right_path)
-                async with gate:
-                    channel_a = await _run_with_timeout(
-                        pipeline.transcribe_text_only, left_path, max_duration_sec, timeout=timeout
-                    )
-                    channel_b = await _run_with_timeout(
-                        pipeline.transcribe_text_only, right_path, max_duration_sec, timeout=timeout
-                    )
+        duration_sec, size_bytes = await asyncio.to_thread(probe_duration_and_size, tmp_path)
+        needs_split = (max_duration_sec is not None and duration_sec > max_duration_sec) or (
+            size_bytes > max_file_size_mb * 1024 * 1024
+        )
+        cut_points: list[float] = []
+        chunk_paths: list[str] = []
+        if needs_split:
+            target_sec = compute_target_chunk_sec(duration_sec, size_bytes, max_duration_sec, max_file_size_mb)
+            cut_points = await asyncio.to_thread(compute_cut_points, tmp_path, target_sec, channels == 2)
+            chunk_paths = await asyncio.to_thread(cut_audio_segments, tmp_path, cut_points)
+        chunk_count = len(cut_points) + 1
+
+        try:
+            if channels == 2:
+                if needs_split:
+                    channel_a, channel_b = await _transcribe_stereo_chunked(cut_points, chunk_paths, timeout)
+                else:
+                    left_fd, left_path = tempfile.mkstemp(suffix=".wav")
+                    right_fd, right_path = tempfile.mkstemp(suffix=".wav")
+                    os.close(left_fd)
+                    os.close(right_fd)
+                    try:
+                        await asyncio.to_thread(split_stereo_channels, tmp_path, left_path, right_path)
+                        async with gate:
+                            channel_a = await _run_with_timeout(
+                                pipeline.transcribe_text_only, left_path, max_duration_sec, timeout=timeout
+                            )
+                            channel_b = await _run_with_timeout(
+                                pipeline.transcribe_text_only, right_path, max_duration_sec, timeout=timeout
+                            )
+                    finally:
+                        for p in (left_path, right_path):
+                            if os.path.exists(p):
+                                os.remove(p)
+
                 await db.set_job_status(job_ids["transcribe"], "completed")
                 await db.set_job_status(job_ids["diarize"], "running")
                 combined = merge_channel_transcripts(channel_a, channel_b, label_a="A", label_b="B")
                 await db.set_job_status(job_ids["diarize"], "completed")
-            finally:
-                for p in (left_path, right_path):
-                    if os.path.exists(p):
-                        os.remove(p)
-        elif channels == 1:
-            async with gate:
-                transcript = await _run_with_timeout(
-                    pipeline.transcribe_with_chars, tmp_path, max_duration_sec, timeout=timeout
-                )
-            await db.set_job_status(job_ids["transcribe"], "completed")
-            await db.set_job_status(job_ids["diarize"], "running")
-            turns = await asyncio.to_thread(diarization_pipeline.diarize, tmp_path)
-            combined = build_mono_diarized_transcript(transcript, turns)
-            await db.set_job_status(job_ids["diarize"], "completed")
-        else:
-            raise UnsupportedChannelLayoutError(channels)
+            else:  # channels == 1
+                if needs_split:
+                    transcript = await _transcribe_mono_chunked(chunk_paths, cut_points, timeout)
+                else:
+                    async with gate:
+                        transcript = await _run_with_timeout(
+                            pipeline.transcribe_with_chars, tmp_path, max_duration_sec, timeout=timeout
+                        )
+                await db.set_job_status(job_ids["transcribe"], "completed")
+                await db.set_job_status(job_ids["diarize"], "running")
+                turns = await asyncio.to_thread(diarization_pipeline.diarize, tmp_path)
+                combined = build_mono_diarized_transcript(transcript, turns)
+                await db.set_job_status(job_ids["diarize"], "completed")
+        finally:
+            for p in chunk_paths:
+                if os.path.exists(p):
+                    os.remove(p)
 
         full_text = " ".join(seg["text"] for seg in combined["segments"]).strip()
-        await db.save_transcript(job_ids["transcribe"], full_text, combined["language"], combined["segments"])
+        await db.save_transcript(
+            job_ids["transcribe"], full_text, combined["language"], combined["segments"], chunk_count=chunk_count
+        )
         speaker_labels = sorted({seg["speaker"] for seg in combined["segments"]})
         await db.ensure_speaker_participants(meeting_id, speaker_labels)
 

@@ -39,6 +39,16 @@ allowed_extensions: [".wav", ".mp3", ".m4a", ".flac", ".ogg", ".webm"]
 max_file_size_mb: 25
 max_duration_sec: 1800
 
+# /api/meetings only: uploads over max_file_size_mb/max_duration_sec are no
+# longer rejected outright - they're split into silence-aligned chunks
+# (Process/audio_split.py), each transcribed separately and merged back into
+# one transcript. max_file_size_mb becomes the *target* size per chunk in
+# that path. This raw ceiling is the real reject-outright limit for the
+# upload itself (protects disk/VRAM/wall-clock from runaway inputs); the
+# other three endpoints (/transcribe, /summarize, /diarize) are unaffected
+# and keep rejecting at max_file_size_mb/max_duration_sec as before.
+meeting_upload_hard_cap_mb: 250
+
 # Concurrency / serving
 request_timeout_sec: 600
 max_queue_size: 10
