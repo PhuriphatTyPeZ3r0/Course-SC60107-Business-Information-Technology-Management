@@ -66,7 +66,7 @@ export default function Home() {
             </Link>
             <Link
               href="/login"
-              className={buttonVariants({ size: "lg", variant: "outline", className: "border-white/20" })}
+              className={buttonVariants({ size: "lg", variant: "outline", className: "border-border" })}
             >
               {t.landing.ctaSecondary}
             </Link>
@@ -74,7 +74,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="relative border-t border-white/10 bg-background/60 py-24">
+      <section className="relative border-t border-border bg-background/60 py-24">
         <div className="mx-auto max-w-6xl px-6">
           <motion.h2
             initial={{ opacity: 0, y: 12 }}

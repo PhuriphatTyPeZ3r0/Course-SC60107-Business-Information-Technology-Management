@@ -18,7 +18,7 @@ export function JobTimeline({ jobs }: { jobs: Job[] }) {
               "flex size-8 shrink-0 items-center justify-center rounded-full border",
               job.status === "completed" && "border-primary bg-primary/20 text-primary",
               job.status === "running" && "border-accent bg-accent/20 text-accent",
-              job.status === "queued" && "border-white/15 text-muted-foreground",
+              job.status === "queued" && "border-border text-muted-foreground",
               job.status === "failed" && "border-destructive bg-destructive/20 text-destructive",
             )}
           >
@@ -34,7 +34,7 @@ export function JobTimeline({ jobs }: { jobs: Job[] }) {
           </div>
           {job.status === "running" && (
             <motion.div
-              className="h-1 flex-1 max-w-24 overflow-hidden rounded-full bg-white/10"
+              className="h-1 flex-1 max-w-24 overflow-hidden rounded-full bg-muted"
               initial={false}
             >
               <motion.div

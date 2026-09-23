@@ -170,12 +170,12 @@ export function ActionItemList({
                 </p>
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   {item.assigneeName && (
-                    <Badge variant="outline" className="border-white/15">
+                    <Badge variant="outline" className="border-border">
                       {t.meetingDetail.assignee}: {item.assigneeName}
                     </Badge>
                   )}
                   {item.dueDate && (
-                    <Badge variant="outline" className="border-white/15">
+                    <Badge variant="outline" className="border-border">
                       {t.meetingDetail.due}: {item.dueDate}
                     </Badge>
                   )}
@@ -198,7 +198,7 @@ export function ActionItemList({
       {isCreating ? (
         <ActionItemForm initial={EMPTY_DRAFT} onCancel={() => setIsCreating(false)} onSubmit={handleCreate} />
       ) : (
-        <Button type="button" variant="outline" className="border-white/15" onClick={() => setIsCreating(true)}>
+        <Button type="button" variant="outline" className="border-border" onClick={() => setIsCreating(true)}>
           <Icon name="add" className="mr-1.5 text-[16px]" />
           {t.meetingDetail.addActionItem}
         </Button>

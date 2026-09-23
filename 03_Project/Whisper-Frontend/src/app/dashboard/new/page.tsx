@@ -88,7 +88,7 @@ export default function NewMeetingPage() {
               <Label htmlFor="file">{t.newMeeting.fileLabel}</Label>
               <label
                 htmlFor="file"
-                className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed border-white/20 px-4 py-8 text-center text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
               >
                 <Icon name="upload" className="text-[24px]" />
                 {file ? file.name : t.newMeeting.fileLabel}
