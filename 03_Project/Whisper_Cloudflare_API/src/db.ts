@@ -652,3 +652,15 @@ export async function updateMeetingTitle(
     .run();
   return result.meta.changes > 0;
 }
+
+/** Soft delete (DEF-001) - getMeetingFull/listTeamMeetings already filter
+ * deleted_at IS NULL, so this is enough to hide it from both without a
+ * destructive DROP. teamId in the WHERE clause is what actually enforces
+ * that you can only delete your own team's meetings. */
+export async function softDeleteMeeting(db: D1Database, meetingId: string, teamId: string): Promise<boolean> {
+  const result = await db
+    .prepare("UPDATE meeting SET deleted_at = ?, updated_at = ? WHERE meeting_id = ? AND team_id = ? AND deleted_at IS NULL")
+    .bind(now(), now(), meetingId, teamId)
+    .run();
+  return result.meta.changes > 0;
+}

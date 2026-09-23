@@ -92,7 +92,14 @@ function decodeGoogleIdToken(jwt: string): GoogleIdTokenPayload {
   const parts = jwt.split(".");
   if (parts.length !== 3) throw new Error("Malformed id_token");
   const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (parts[1].length % 4)) % 4);
-  return JSON.parse(atob(b64));
+  // atob() yields a binary string (one char per byte) - JSON.parse'ing that
+  // directly (the DEF-003 bug) mangled any multi-byte UTF-8 name (e.g. Thai)
+  // into mojibake. Re-decode the bytes as UTF-8 first, matching how the
+  // frontend's base64UrlDecodeJson (auth/callback/page.tsx) already does it.
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return JSON.parse(new TextDecoder().decode(bytes));
 }
 
 function base64UrlEncodeJson(value: unknown): string {
@@ -281,6 +288,13 @@ async function handlePatchMeeting(
   return json({ meeting }, 200, origin);
 }
 
+/** DEF-001: soft delete - see db.softDeleteMeeting(). */
+async function handleDeleteMeeting(meetingId: string, auth: Auth, env: Env, origin: string): Promise<Response> {
+  const deleted = await db.softDeleteMeeting(env.DB, meetingId, auth.teamId);
+  if (!deleted) return errorJson("NOT_FOUND", "Meeting not found", 404, origin);
+  return json({ deleted: true }, 200, origin);
+}
+
 async function handleCreateActionItem(
   meetingId: string,
   request: Request,
@@ -341,7 +355,7 @@ export default {
       return new Response(null, {
         headers: {
           "Access-Control-Allow-Origin": origin,
-          "Access-Control-Allow-Methods": "GET, POST, PATCH, OPTIONS",
+          "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
           "Access-Control-Allow-Headers": "Content-Type, Authorization",
         },
       });
@@ -370,6 +384,7 @@ export default {
       const meetingMatch = pathname.match(/^\/api\/meetings\/([^/]+)$/);
       if (method === "GET" && meetingMatch) return await handleGetMeeting(meetingMatch[1], auth, env, origin);
       if (method === "PATCH" && meetingMatch) return await handlePatchMeeting(meetingMatch[1], request, auth, env, origin);
+      if (method === "DELETE" && meetingMatch) return await handleDeleteMeeting(meetingMatch[1], auth, env, origin);
 
       const meetingActionItemsMatch = pathname.match(/^\/api\/meetings\/([^/]+)\/action-items$/);
       if (method === "POST" && meetingActionItemsMatch) {

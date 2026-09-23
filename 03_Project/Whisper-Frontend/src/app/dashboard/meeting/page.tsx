@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Icon } from "@/components/icon";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +13,7 @@ import { MeetingStatusBadge } from "@/components/status-badge";
 import { JobTimeline } from "@/components/job-timeline";
 import { TranscriptView } from "@/components/transcript-view";
 import { ActionItemList } from "@/components/action-item-list";
+import { DeleteMeetingDialog } from "@/components/delete-meeting-dialog";
 import { useLanguage } from "@/lib/i18n/context";
 import { useMounted } from "@/lib/hooks/use-mounted";
 import { api } from "@/lib/api/client";
@@ -89,6 +90,7 @@ function MeetingDetailContent() {
   const id = useSearchParams().get("id") ?? "";
   const { t } = useLanguage();
   const mounted = useMounted();
+  const router = useRouter();
   const [meeting, setMeeting] = useState<Meeting | null>(null);
 
   useEffect(() => {
@@ -138,7 +140,10 @@ function MeetingDetailContent() {
               meeting={meeting}
               onRenamed={(title) => setMeeting((m) => (m ? { ...m, title } : m))}
             />
-            <MeetingStatusBadge status={meeting.status} />
+            <div className="flex shrink-0 items-center gap-1">
+              <MeetingStatusBadge status={meeting.status} />
+              <DeleteMeetingDialog meetingId={meeting.id} onDeleted={() => router.push("/dashboard")} />
+            </div>
           </div>
 
           {meeting.status === "processing" && (

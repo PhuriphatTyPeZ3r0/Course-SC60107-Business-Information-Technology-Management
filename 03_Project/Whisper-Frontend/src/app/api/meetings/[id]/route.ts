@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getMeeting, renameMeeting } from "@/lib/server/mockStore";
+import { deleteMeeting, getMeeting, renameMeeting } from "@/lib/server/mockStore";
 
 export async function GET(
   _request: Request,
@@ -33,4 +33,16 @@ export async function PATCH(
   }
 
   return NextResponse.json({ meeting });
+}
+
+export async function DELETE(
+  _request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  const { id } = await context.params;
+  const deleted = deleteMeeting(id);
+  if (!deleted) {
+    return NextResponse.json({ error: "Meeting not found" }, { status: 404 });
+  }
+  return NextResponse.json({ deleted: true });
 }

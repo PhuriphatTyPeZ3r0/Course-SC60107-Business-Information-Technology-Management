@@ -322,6 +322,14 @@ export function renameMeeting(id: string, title: string): Meeting | null {
   return materialize(meeting);
 }
 
+/** DEF-001: soft delete - mirrors the real backend's deleted_at semantics
+ * by just removing it from the mock's in-memory map (no undo needed here,
+ * this store isn't persisted anyway). */
+export function deleteMeeting(id: string): boolean {
+  const store = getStore();
+  return store.meetings.delete(id);
+}
+
 export function createActionItem(
   meetingId: string,
   input: { description: string; assigneeName: string | null; dueDate: string | null },

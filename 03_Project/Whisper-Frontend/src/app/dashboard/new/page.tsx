@@ -100,6 +100,7 @@ export default function NewMeetingPage() {
                 className="sr-only"
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               />
+              <p className="text-xs text-muted-foreground">{t.newMeeting.fileHint}</p>
             </div>
 
             <Button type="submit" className="w-full" disabled={isSubmitting || !file || !!blockedReason}>

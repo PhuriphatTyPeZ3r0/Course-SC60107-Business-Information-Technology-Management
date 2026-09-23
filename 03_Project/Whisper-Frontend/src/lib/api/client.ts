@@ -141,6 +141,8 @@ export const api = {
       body: JSON.stringify({ title }),
     }),
 
+  deleteMeeting: (id: string) => request<{ deleted: true }>(`/api/meetings/${id}`, { method: "DELETE" }),
+
   createActionItem: (
     meetingId: string,
     input: { description: string; assigneeName?: string | null; dueDate?: string | null },
