@@ -15,6 +15,7 @@ import { TranscriptView } from "@/components/transcript-view";
 import { ActionItemList } from "@/components/action-item-list";
 import { DeleteMeetingDialog } from "@/components/delete-meeting-dialog";
 import { SummaryView } from "@/components/summary-view";
+import { ExportMenu } from "@/components/export-menu";
 import { useLanguage } from "@/lib/i18n/context";
 import { useMounted } from "@/lib/hooks/use-mounted";
 import { api } from "@/lib/api/client";
@@ -141,8 +142,9 @@ function MeetingDetailContent() {
               meeting={meeting}
               onRenamed={(title) => setMeeting((m) => (m ? { ...m, title } : m))}
             />
-            <div className="flex shrink-0 items-center gap-1">
+            <div className="flex shrink-0 items-center gap-2">
               <MeetingStatusBadge status={meeting.status} />
+              {meeting.status === "completed" && <ExportMenu meeting={meeting} />}
               <DeleteMeetingDialog meetingId={meeting.id} onDeleted={() => router.push("/dashboard")} />
             </div>
           </div>

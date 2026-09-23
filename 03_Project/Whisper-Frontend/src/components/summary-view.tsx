@@ -1,4 +1,4 @@
-type SummaryBlock =
+export type SummaryBlock =
   | { type: "heading"; text: string }
   | { type: "paragraph"; text: string }
   | { type: "list"; items: string[] };
@@ -8,7 +8,7 @@ type SummaryBlock =
 // paragraph - this parses that shape into real block elements. Text with
 // none of those markers (old summaries generated before this fix) just
 // falls through as a single paragraph, unchanged from before.
-function parseSummary(text: string): SummaryBlock[] {
+export function parseSummary(text: string): SummaryBlock[] {
   const lines = text
     .split("\n")
     .map((line) => line.trim())
