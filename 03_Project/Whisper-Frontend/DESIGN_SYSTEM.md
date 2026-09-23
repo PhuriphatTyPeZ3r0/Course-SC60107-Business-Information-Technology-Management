@@ -157,16 +157,7 @@ Completed via Chrome automation on the existing `Whisper-PJ-API` Google Cloud pr
    - **Client Secret**: copied directly by the user from the Cloud Console dialog, never seen by Claude. Still needs `wrangler secret put GOOGLE_CLIENT_SECRET` run by the user before implementation.
 4. ~~`PII_ENCRYPTION_KEY` / `PII_LOOKUP_HMAC_KEY` / `AUTH_SECRET`~~ — generated locally via `openssl rand -base64 32` (`AUTH_SECRET` wasn't in the original checklist - it signs the session token, carried over unchanged from the pre-Google design, and was easy to miss until implementation started). **Not yet set as Worker secrets** — Claude Code's auto-mode classifier blocks secret-store writes; the user needs to run the `wrangler secret put` commands themselves (values were echoed once in that session's terminal output).
 
-**Implementation is done** (both backend and frontend - see below), committed on `feature/google-sso-encryption`, fully typechecked, built, and verified locally against the mock backend (sign-in, dashboard, logout, 401-redirect). **Not deployed and not merged to main** - doing either now would break the currently-working login for real users, since the new code can't actually sign anyone in without the four secrets below set first:
-
-```
-npx wrangler secret put GOOGLE_CLIENT_SECRET
-npx wrangler secret put AUTH_SECRET
-npx wrangler secret put PII_ENCRYPTION_KEY
-npx wrangler secret put PII_LOOKUP_HMAC_KEY
-```
-
-Run these (in `Whisper_Cloudflare_API`), then say the word and this gets deployed, live-verified with a real Google sign-in, and merged.
+**Shipped (2026-09-22).** All four Worker secrets were set, the Worker and frontend were deployed, live Google sign-in was verified, and `feature/google-sso-encryption` was merged to `main`.
 
 **Frontend:**
 - Replace `login/page.tsx`'s email/password form with a single "Sign in with Google" button.
@@ -196,16 +187,16 @@ Run these (in `Whisper_Cloudflare_API`), then say the word and this gets deploye
 - [x] Frontend: click-to-edit meeting title in `dashboard/meeting/page.tsx`
 - [x] Deployed and verified live
 
-### In progress - code done, not deployed (§5b: Google SSO, per-user isolation, PII encryption)
+### Done (deployed to production, 2026-09-22) — §5b: Google SSO, per-user isolation, PII encryption
 - [x] Google Cloud OAuth setup (§5b-iv) — consent screen, published to Production, OAuth client created, `/privacy` page live
-- [x] Migration `0004`: `email_encrypted`/`email_lookup_hash`/`display_name_encrypted`/`google_sub` on `user_account` — **applied to the live D1 database already** (additive, safe ahead of the code deploy)
+- [x] Migration `0004`: `email_encrypted`/`email_lookup_hash`/`display_name_encrypted`/`google_sub` on `user_account` — applied to the live D1 database
 - [x] Backend: `GET /api/auth/google/callback`, `findOrCreateGoogleUser()` + personal-team auto-creation, `Authorization: Bearer` verification on every other route, team-scoped WHERE clauses on every meeting/action-item read and write (not just at login - a guessed ID from another team 404s)
 - [x] Backend: AES-256-GCM + HMAC blind-index helpers in `auth.ts`
 - [x] Frontend: "Sign in with Google" button, new `/auth/callback` route, dead password-auth code and the "Demo mode" notice removed
 - [x] Typechecked, built, and verified locally against the mock backend (sign-in/dashboard/logout/401-redirect)
-- [ ] **You**: set the four Worker secrets (`GOOGLE_CLIENT_SECRET`, `AUTH_SECRET`, `PII_ENCRYPTION_KEY`, `PII_LOOKUP_HMAC_KEY` — commands above) — blocks the two items below
-- [ ] Deploy Worker + frontend, verify live with a real Google sign-in
-- [ ] Merge `feature/google-sso-encryption` to `main`
+- [x] Worker secrets set (`GOOGLE_CLIENT_SECRET`, `AUTH_SECRET`, `PII_ENCRYPTION_KEY`, `PII_LOOKUP_HMAC_KEY`) — confirmed via `wrangler secret list`
+- [x] Deployed Worker + frontend, verified live with a real Google sign-in (Worker deploy 2026-09-22T17:20Z, frontend deploy 2026-09-22T17:30Z)
+- [x] Merged `feature/google-sso-encryption` to `main`
 
 ### Later
 - [ ] Soft delete: `DELETE`/`restore` endpoints, Trash view, confirm-dialog on delete
