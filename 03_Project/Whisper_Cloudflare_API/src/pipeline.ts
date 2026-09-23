@@ -5,8 +5,34 @@ import type { Env, JobType } from "./types";
 const SUMMARY_MODEL = "@cf/meta/llama-3.1-8b-instruct-fp8";
 const WHISPER_MODEL = "@cf/openai/whisper-large-v3-turbo";
 
-const SUMMARY_PROMPT =
-  "สรุปใจความสำคัญของบทสนทนาต่อไปนี้โดยเน้นประเด็นสำคัญและข้อสรุปเป็นข้อความสั้นๆ:\n\n";
+// DEF-005: the old one-line prompt produced a single run-on paragraph with
+// no structure. Ported from Whisper_Backend_API's Gemini system prompt
+// (branch Fix_Diarize) since it already specifies the exact markdown shape
+// (headings + bullets) we want - kept model-agnostic here since this
+// pipeline stays on Workers AI, only the prompt moved.
+const SUMMARY_SYSTEM_PROMPT = `คุณคือผู้ช่วยสรุปบทสนทนาและการประชุมภาษาไทย ข้อความที่ได้รับเป็นผลถอดเสียงอัตโนมัติ อาจมีคำผิดหรือคำที่ฟังเพี้ยน และอาจมีป้ายผู้พูด เช่น A, B หรือ SPEAKER_1
+
+หลักการ:
+- ใช้เฉพาะข้อมูลที่อยู่ในบทสนทนา ห้ามเดาหรือเพิ่มข้อมูลที่ไม่มี
+- ถ้าคำใดฟังดูผิดชัดเจนจากบริบท ให้ใช้คำที่น่าจะถูกต้อง แต่ถ้าไม่แน่ใจให้คงไว้ตามเดิม
+- ตัวเลข วันที่ เวลา ชื่อ และจำนวนเงิน ต้องคงตามที่พูดไว้อย่างแม่นยำ
+- เขียนเป็นภาษาไทยที่กระชับ อ่านง่าย ไม่ต้องเกริ่นนำหรือลงท้ายด้วยคำอธิบายเพิ่มเติม
+
+ตอบตามรูปแบบนี้เท่านั้น (ข้ามหัวข้อที่ไม่มีข้อมูลจริง):
+
+**สรุปโดยย่อ**
+(2-3 ประโยค บอกว่าเรื่องอะไร ใครเกี่ยวข้อง และผลลัพธ์สำคัญ)
+
+**ประเด็นสำคัญ**
+- (ข้อสำคัญของการสนทนา เรียงตามลำดับ)
+
+**ข้อสรุปหรือมติ**
+- (สิ่งที่ตกลงหรือตัดสินใจกัน)
+
+**สิ่งที่ต้องดำเนินการ**
+- (งาน — ผู้รับผิดชอบ — กำหนดเวลา เฉพาะที่ระบุไว้ในบทสนทนา)`;
+
+const SUMMARY_PROMPT = "สรุปบทสนทนาต่อไปนี้ตามรูปแบบที่กำหนด:\n\n";
 
 interface WhisperSegment {
   start: number;
@@ -120,7 +146,10 @@ export async function runMeetingPipeline(
 
     await db.setJobStatus(env.DB, jobIds.summarize, "running");
     const summaryResponse = (await env.AI.run(SUMMARY_MODEL, {
-      messages: [{ role: "user", content: SUMMARY_PROMPT + fullText }],
+      messages: [
+        { role: "system", content: SUMMARY_SYSTEM_PROMPT },
+        { role: "user", content: SUMMARY_PROMPT + fullText },
+      ],
     } as never)) as unknown as { response: string };
     await db.saveSummary(env.DB, jobIds.summarize, summaryResponse.response.trim(), SUMMARY_MODEL);
     await db.setJobStatus(env.DB, jobIds.summarize, "completed");

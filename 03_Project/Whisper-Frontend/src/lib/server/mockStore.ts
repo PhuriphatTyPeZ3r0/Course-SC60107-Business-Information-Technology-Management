@@ -72,8 +72,21 @@ function buildTranscriptSegments(): SpeakerSegment[] {
   });
 }
 
-const SUMMARY_TEXT =
-  "ทีมรายงานความคืบหน้า 3 ด้าน: (1) UI หน้าหลักเสร็จแล้ว รอฟีดแบ็ก (2) ฝั่ง backend พบปัญหา VRAM ระหว่างรันโมเดลขนาดใหญ่ ตัดสินใจลด scope ชั่วคราว (3) ทีมตกลงโฟกัสที่การเตรียม demo ให้ทันวันศุกร์ และนัดประชุมติดตามผลวันพฤหัสบดี เวลา 14:00 น.";
+// DEF-005: mirrors the markdown-lite shape the real summarize prompt now
+// asks for (see Whisper_Cloudflare_API/src/pipeline.ts), so local dev
+// previews the fixed formatting instead of the old run-on paragraph.
+const SUMMARY_TEXT = `**สรุปโดยย่อ**
+ทีมรายงานความคืบหน้า 3 ด้าน ได้แก่ UI หน้าหลัก ฝั่ง backend และแผนเตรียม demo โดยตกลงโฟกัสที่การเตรียม demo ให้ทันวันศุกร์
+
+**ประเด็นสำคัญ**
+- UI หน้าหลักเสร็จแล้ว อยู่ระหว่างรอฟีดแบ็ก
+- ฝั่ง backend พบปัญหา VRAM ระหว่างรันโมเดลขนาดใหญ่ ตัดสินใจลด scope ชั่วคราว
+
+**ข้อสรุปหรือมติ**
+- ทีมตกลงโฟกัสที่การเตรียม demo ให้ทันวันศุกร์
+
+**สิ่งที่ต้องดำเนินการ**
+- นัดประชุมติดตามผล — ทีมทั้งหมด — วันพฤหัสบดี เวลา 14:00 น.`;
 
 function buildActionItems(meetingId: string): ActionItem[] {
   return [

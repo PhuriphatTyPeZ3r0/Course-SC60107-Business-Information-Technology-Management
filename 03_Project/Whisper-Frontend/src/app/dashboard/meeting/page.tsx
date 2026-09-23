@@ -14,6 +14,7 @@ import { JobTimeline } from "@/components/job-timeline";
 import { TranscriptView } from "@/components/transcript-view";
 import { ActionItemList } from "@/components/action-item-list";
 import { DeleteMeetingDialog } from "@/components/delete-meeting-dialog";
+import { SummaryView } from "@/components/summary-view";
 import { useLanguage } from "@/lib/i18n/context";
 import { useMounted } from "@/lib/hooks/use-mounted";
 import { api } from "@/lib/api/client";
@@ -194,7 +195,7 @@ function MeetingDetailContent() {
                 <TabsContent value="summary">
                   <Card className="glass-panel">
                     <CardContent className="pt-6">
-                      <p className="text-sm leading-relaxed">{meeting.summary.text}</p>
+                      <SummaryView text={meeting.summary.text} />
                     </CardContent>
                   </Card>
                 </TabsContent>
