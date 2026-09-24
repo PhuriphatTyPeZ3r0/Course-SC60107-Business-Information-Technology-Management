@@ -198,6 +198,10 @@ CREATE TABLE tbl_transcript (
     full_text       TEXT NOT NULL,
     language_code   CHAR(2) NOT NULL,
     word_count      INT,
+    -- How many audio chunks this transcript was assembled from (see
+    -- Process/audio_split.py). 1 means the source audio fit within
+    -- max_duration_sec/max_file_size_mb and was transcribed in one pass.
+    chunk_count     INT NOT NULL DEFAULT 1,
     full_text_tsv   TSVECTOR GENERATED ALWAYS AS (to_tsvector('simple', full_text)) STORED,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT pk_tbl_transcript PRIMARY KEY (transcript_id),

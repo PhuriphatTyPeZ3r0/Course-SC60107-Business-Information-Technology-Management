@@ -175,8 +175,14 @@ async def set_meeting_status(meeting_id: str, status: str) -> None:
     await _pool.execute("CALL usp_update_meeting($1, NULL, NULL, $2)", meeting_id, status)
 
 
-async def save_transcript(job_id: str, full_text: str, language_code: str, segments: list[dict]) -> str:
-    """segments: [{"speaker": str, "start": seconds, "end": seconds, "text": str}, ...]"""
+async def save_transcript(
+    job_id: str, full_text: str, language_code: str, segments: list[dict], chunk_count: int = 1
+) -> str:
+    """segments: [{"speaker": str, "start": seconds, "end": seconds, "text": str}, ...]
+
+    chunk_count: how many audio chunks (Process/audio_split.py) this transcript
+    was assembled from; 1 for the ordinary single-pass path.
+    """
     assert _pool is not None
     payload = [
         {
@@ -189,7 +195,7 @@ async def save_transcript(job_id: str, full_text: str, language_code: str, segme
     ]
     async with _pool.acquire() as conn:
         transcript_id = await conn.fetchval(
-            "SELECT usp_create_transcript($1, $2, $3)", job_id, full_text, language_code
+            "SELECT usp_create_transcript($1, $2, $3, NULL, $4)", job_id, full_text, language_code, chunk_count
         )
         if payload:
             await conn.fetchval(
@@ -299,7 +305,7 @@ async def get_meeting_full(meeting_id: str) -> dict | None:
         transcript = None
         if transcribe_job is not None and transcribe_job["status"] == "completed":
             t_row = await conn.fetchrow(
-                "SELECT transcript_id, full_text, language_code, word_count FROM tbl_transcript "
+                "SELECT transcript_id, full_text, language_code, word_count, chunk_count FROM tbl_transcript "
                 "WHERE job_id = $1",
                 transcribe_job["job_id"],
             )
@@ -314,6 +320,11 @@ async def get_meeting_full(meeting_id: str) -> dict | None:
                     "fullText": t_row["full_text"],
                     "languageCode": t_row["language_code"],
                     "wordCount": t_row["word_count"],
+                    # True when the source audio exceeded max_duration_sec/
+                    # max_file_size_mb and had to be split (Process/audio_split.py)
+                    # before transcription; purely informational for debugging.
+                    "chunked": t_row["chunk_count"] > 1,
+                    "chunkCount": t_row["chunk_count"],
                     "segments": [
                         {
                             "id": str(s["speaker_segment_id"]),

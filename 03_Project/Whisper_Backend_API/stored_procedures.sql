@@ -507,13 +507,14 @@ $$ LANGUAGE plpgsql;
 -- tbl_transcript
 -- =====================================================================
 CREATE FUNCTION usp_create_transcript(
-    p_job_id UUID, p_full_text TEXT, p_language_code CHAR(2), p_word_count INT DEFAULT NULL
+    p_job_id UUID, p_full_text TEXT, p_language_code CHAR(2), p_word_count INT DEFAULT NULL,
+    p_chunk_count INT DEFAULT 1
 ) RETURNS BIGINT AS $$
 DECLARE
     v_transcript_id BIGINT;
 BEGIN
-    INSERT INTO tbl_transcript (job_id, full_text, language_code, word_count)
-    VALUES (p_job_id, p_full_text, p_language_code, COALESCE(p_word_count, array_length(regexp_split_to_array(trim(p_full_text), '\s+'), 1)))
+    INSERT INTO tbl_transcript (job_id, full_text, language_code, word_count, chunk_count)
+    VALUES (p_job_id, p_full_text, p_language_code, COALESCE(p_word_count, array_length(regexp_split_to_array(trim(p_full_text), '\s+'), 1)), COALESCE(p_chunk_count, 1))
     RETURNING transcript_id INTO v_transcript_id;
     RETURN v_transcript_id;
 EXCEPTION
